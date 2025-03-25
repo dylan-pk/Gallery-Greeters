@@ -1,0 +1,41 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/alec/ros2_ws/install/turtlesim/include/**",
+        "/home/alec/ros2_ws/install/turtlebot3_fake_node/include/**",
+        "/home/alec/ros2_ws/install/turtlebot3_msgs/include/**",
+        "/home/alec/ros2_ws/install/turtlebot3_gazebo/include/**",
+        "/home/alec/ros2_ws/install/robot_localization/include/**",
+        "/home/alec/ros2_ws/install/dynamixel_sdk_custom_interfaces/include/**",
+        "/home/alec/ros2_ws/install/dynamixel_sdk/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/alec/ros2_ws/src/DynamixelSDK/dynamixel_sdk/include/**",
+        "/home/alec/ros2_ws/src/DynamixelSDK/dynamixel_sdk_examples/include/**",
+        "/home/alec/ros2_ws/src/cpp_laserread/include/**",
+        "/home/alec/ros2_ws/src/crop_colour_node/include/**",
+        "/home/alec/ros2_ws/src/dead_reckoning_node/include/**",
+        "/home/alec/ros2_ws/src/obstacle_detection/include/**",
+        "/home/alec/ros2_ws/src/pController/include/**",
+        "/home/alec/ros2_ws/src/robot_localization/include/**",
+        "/home/alec/ros2_ws/src/ros_tutorials/turtlesim/include/**",
+        "/home/alec/ros2_ws/src/scan_matching_localiser/include/**",
+        "/home/alec/ros2_ws/src/scan_to_image/include/**",
+        "/home/alec/ros2_ws/src/turtlebot3/turtlebot3_node/include/**",
+        "/home/alec/ros2_ws/src/turtlebot3_simulations/turtlebot3_fake_node/include/**",
+        "/home/alec/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

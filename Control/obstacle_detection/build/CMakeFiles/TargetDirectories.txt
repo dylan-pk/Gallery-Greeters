@@ -1,0 +1,10 @@
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/uninstall.dir
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/obstacle_detection_uninstall.dir
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/obstacle_detection.dir
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/test.dir
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/edit_cache.dir
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/rebuild_cache.dir
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/list_install_components.dir
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/install.dir
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/install/local.dir
+/home/alec/ros2_ws/src/obstacle_detection/build/CMakeFiles/install/strip.dir
