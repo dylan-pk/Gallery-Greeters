@@ -1,0 +1,7 @@
+{
+  "package_name": "audio_messages",
+  "non_idl_tuples": [
+    "/home/anika/ros2_ws/src/audio_messages:msg/AudioData.msg",
+    "/home/anika/ros2_ws/src/audio_messages:msg/AudioInfo.msg"
+  ]
+}

@@ -1,0 +1,2 @@
+2025-03-19 13:27:02.182 | DEBUG    | __main__:__init__:40 - Default input device: 2
+2025-03-19 13:27:02.182 | DEBUG    | __main__:__init__:43 - Node created

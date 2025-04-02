@@ -1,0 +1,5 @@
+2025-03-19 13:24:37.121 | INFO     | __main__:__init__:123 - Wait 2 seconds for launch file
+2025-03-19 13:24:37.132 | DEBUG    | __main__:__init__:39 - Default input device: 2
+2025-03-19 13:24:37.132 | DEBUG    | __main__:__init__:39 - Default input device: 2
+2025-03-19 13:24:37.132 | DEBUG    | __main__:__init__:42 - Node created
+2025-03-19 13:24:37.132 | DEBUG    | __main__:__init__:42 - Node created
