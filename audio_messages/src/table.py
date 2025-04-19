@@ -1,3 +1,4 @@
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 class Table:
     def __init__(self, number, location, maxCapacity=4):
         self.tableNum = number
@@ -18,8 +19,20 @@ class Table:
     def setDrinkStatus(self, state):
         self.awaitingDrink = state
     
+    def getOccupants(self):
+        return self.occupants
+    
+    def getTableNum(self):
+        return self.tableNum
+    
+    def getLocation(self):
+        return self.location
+    
+    def getFullness(self):
+        return (int(self.occupants)/int(self.maxCapacity))
+    
     def getCurrentTableStatus(self):
-        return [self.tableNum, self.occupants, self.awaitingDrink]
+        return [self.tableNum, f"{self.occupants} / {self.maxCapacity}", self.awaitingDrink]
     
     def allTableInfo(self):
         print(f"Table #{self.tableNum} at {self.location} has {self.occupants}/{self.maxCapacity} and waiting for drink is {self.awaitingDrink}")

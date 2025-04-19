@@ -3,8 +3,12 @@ import pyttsx3
 import pyaudio
 import random
 import time
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw, ImageFont
 import tkinter as tk
+from tableOrganisation import TableDatabase
+
+DURATION = 3000
+WPM = 160
 
 class Commands:
 
@@ -13,63 +17,106 @@ class Commands:
         # initialising a recogniser
         self.r = sr.Recognizer()
         self.engine = pyttsx3.init()
+        # self.testingVoices()
+        self.engine.setProperty('rate',WPM)
+        voices = self.engine.getProperty('voices')
+        self.engine.setProperty('voice', voices[19].id) 
+
 
         self.root = tk.Tk()
 
         ## Data needed to make images halfscreen
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
+        self.screen_width = self.root.winfo_screenwidth()
+        self.screen_height = self.root.winfo_screenheight()
         # Half size
-        half_width = screen_width // 2
-        half_height = screen_height // 2
-
-        self.root.geometry(f"{half_width}x{half_height}")
+        self.half_width = self.screen_width // 2
+        self.half_height = self.screen_height // 2
+        
+        # Establishing the root used
+        self.root.geometry(f"{self.half_width}x{self.half_height}")
         self.root.bind("<Escape>", lambda e: self.root.destroy())
+        
+        ## Establishing all the images
+        self.loadInfo()
 
-        default_image_path = "src/resources/default.png"
-        default_image = Image.open(default_image_path)
-        self.tk_default_image = ImageTk.PhotoImage(default_image)
-        # image.show()
-
+        self.tk_default_image = ImageTk.PhotoImage(self.default_image)
         self.label = tk.Label(self.root, image=self.tk_default_image)
-        # self.label.image = self.default_image
-        self.label.pack(expand=True)        
+        self.label.pack(expand=True)    
+        self.fullScreenImage(self.default_image) 
+        # self.runGUI()   
 
-        with open("src/resources/funfacts.txt", "r") as file:
-            self.facts = file.readlines()
+    def getNumofTables(self):
+        return self.tables.getNumofTables()
+    
+    def speakingTimeEst(self, text):
+        words = len(text.split())
+        wps = WPM / 60
+        return int((words / wps) * 1000)
+        
+    def loadInfo(self):
+        # Robot Faces
+        self.default_image = Image.open("src/resources/default.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.dancingFace = Image.open("src/resources/danceFace.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.chargeFace = Image.open("src/resources/chargeFace.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.callingFace = Image.open("src/resources/callingWaiter.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
+
+        # Information about Artwork        
+        with open("src/resources/ArtworkInfo/artworkInfo.txt", "r") as artFile:
+            self.artworks = artFile.readline().split("/")
+            self.artInfo = artFile.readlines()
+        self.artImages = {a: Image.open(f"src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
+                           for a in range(5)}
+
+        # Fun Facts
+        with open("src/resources/FunFacts/funfacts.txt", "r") as factFile:
+            self.facts = factFile.readlines()
+        self.factImages = {i: Image.open(f"src/resources/FunFacts/image{i}.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
+                           for i in range(10)}
+        
+        # Table Database
+        self.tables = TableDatabase("src/resources/tableInfo.txt")
+
+    def runGUI(self):
+        self.root.mainloop()
 
     def fullScreenImage(self, newImage, duration=4000):
         tk_image = ImageTk.PhotoImage(newImage)
         self.label.configure(image=tk_image)
-        # self.label.image = newImage
+        self.label.image = tk_image
         self.root.after(duration, self.resetToDefault)
 
     def resetToDefault(self):
         self.label.configure(image=self.tk_default_image)
-        # self.label.image = self.default_image
+        self.label.image = self.tk_default_image
 
     # Convert Text to Speech
     def SpeakText(self, command):
         self.engine.say(command)
         # The say function does not work without a run and wait command
         self.engine.runAndWait()
+        time.sleep(0.25)
 
-    ## SPECIFIC COMMAND FUNCTONS
+    ########################################################## SPECIFIC COMMAND FUNCTONS ##########################################################################
     
     def modeChange(self, mode):
         match mode:
             case 0: # Greet Guests
                 print("Greeting Guests Command Recognised")
                 self.SpeakText("going to door to greet guests")
+
             case 1: # Wander Around
-                self.SpeakText("beginning wander mode")
                 print("Wander Command Recognised")
+                self.SpeakText("beginning wander mode")
+
             case 2: # Go to Charging Port
-                self.SpeakText("returning to charging port")
                 print("Charging Command Recognised")
+                self.fullScreenImage(self.chargeFace,DURATION)
+                self.SpeakText("returning to charging port")
+
             case 3: # Dance Mode
-                self.SpeakText("Dancey Dancey")
                 print("dance mode activated")
+                self.fullScreenImage(self.dancingFace,DURATION)
+                self.SpeakText("Dancey Dancey")
 
     def sendDrinkOrder(self, drinks, table):
         for i in range(3):
@@ -78,27 +125,47 @@ class Commands:
     def artWorkInfo(self):
         # Read closest artwork from publisher
         print("Artwork Info Command Registered")
-    
+        print(f"1: {self.artworks[0]}\n2: {self.artworks[1]}\n3: {self.artworks[2]}\n4: {self.artworks[3]}\n5: {self.artworks[4]}")
+        artwork = int(input("Artwork: "))
+        if artwork == self.artworks[0] or artwork == 1: # The Ugly Duchess
+                self.fullScreenImage(self.artImages[0], (self.speakingTimeEst(self.artInfo[0]) + DURATION))
+                self.SpeakText(self.artInfo[0].lower())
+        elif artwork == self.artworks[1] or artwork == 2: # Composition of Red Yellow and Blue
+                self.fullScreenImage(self.artImages[1], (self.speakingTimeEst(self.artInfo[1]) + DURATION))
+                self.SpeakText(self.artInfo[1].lower())
+        elif artwork == self.artworks[2] or artwork == 3: # Scene from Moby Dick
+                self.fullScreenImage(self.artImages[2], (self.speakingTimeEst(self.artInfo[2]) + DURATION))
+                self.SpeakText(self.artInfo[2].lower())
+        elif artwork == self.artworks[3] or artwork == 4: # Flowers in Four Seasons
+                self.fullScreenImage(self.artImages[3], (self.speakingTimeEst(self.artInfo[3]) + DURATION))
+                self.SpeakText(self.artInfo[3].lower())
+        elif artwork == self.artworks[4] or artwork == 5: # The Persistence of Memory
+                self.fullScreenImage(self.artImages[4], (self.speakingTimeEst(self.artInfo[4]) + DURATION))
+                self.SpeakText(self.artInfo[4].lower())
+                
     def tableStatus(self):
         print("Table Status Command Registered")
+        statusImage = self.tables.generateTableStatusImage(self.half_width, self.half_height)
+        self.fullScreenImage(statusImage, DURATION)
 
     def callWaiter(self, location):
-        print("Call Waiter Command Recognised")
+        print(f"Call Waiter Command Recognised, Location is {location}")
+        self.SpeakText("calling a waiter here")
+        self.fullScreenImage(self.callingFace, DURATION)
+        
 
     def goToTable(self, table):
-        print("Go To Table Command Recognised")
+        tableLocation = self.tables.findTableLocation(table)
+        self.SpeakText(f"follow me to table {str(table)}")
+        print(f"Go To Table Command Recognised, Table Location is: {tableLocation}")
 
     def funFact(self):
         factNum = random.randint(0,9)
-
-        # Setting up the image
-        image_path = f"src/resources/image{factNum}.png"
-        image = Image.open(image_path)
-
         # Outputting the fact image and audio
         print("Fun Fact " + self.facts[factNum])
-        # image.show()
-        self.SpeakText(self.facts[factNum].lower())
+        self.SpeakText(self.facts[factNum])
+        self.fullScreenImage(self.factImages[factNum],(self.speakingTimeEst(self.facts[factNum])+DURATION))
+        
         
 
 

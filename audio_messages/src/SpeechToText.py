@@ -2,12 +2,14 @@ import speech_recognition as sr
 import pyttsx3
 import pyaudio
 from commands import Commands
+# from tableOrganisation import TableDatabase
+import threading
 # spoken = False
 
 TESTING_MODE = True
 
+## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
 class SpeechToText:
-    tables = [1,2,3,4,5]
     numbers = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
 
     def __init__(self):
@@ -15,15 +17,31 @@ class SpeechToText:
         self.r = sr.Recognizer()
         # creating pyaudio object so debugging
         self.device = pyaudio.PyAudio()
-        self.comms = Commands()
+        print(self.device.get_default_input_device_info())
         self.deviceNum = self.device.get_default_input_device_info()["index"]
 
-    # # Convert Text to Speech
-    # def SpeakText(command):9
-    #     engine = pyttsx3.init()
-    #     engine.say(command)
-    #     # The say function does not work without a run and wait command
-    #     engine.runAndWait()
+        self.comms = Commands()
+        self.numOfTables = self.comms.getNumofTables()
+        # imagesThread = threading.Thread(target=self.comms.runGUI, daemon=True)
+        # imagesThread.start()
+
+        self.listeningEnabled = True
+        self.startVoiceRecognition()
+        
+
+    def startVoiceRecognition(self):
+        audioThread = threading.Thread(target=self.commandAudioRecordingLoop, daemon=True)
+        audioThread.start()
+    
+    def commandAudioRecordingLoop(self):
+        while True:
+            if self.listeningEnabled: # using a flag so if multi prompt stuff is happening then the command audio loop doesn't get confused
+                if TESTING_MODE == False:
+                    recordedText = self.audioRecording(self.deviceNum, "Run", 1)
+                    if recordedText != None:
+                        self.processText(recordedText)
+                else:
+                    self.processText("",testing=True)
 
     def processText(self, text, testing = False):
         print("processing")
@@ -32,28 +50,27 @@ class SpeechToText:
             for word in words:
                 match word:
                     case "greeting":
-                        self.comms.modeChange(0)
+                        self.comms.modeChange(0) # Waiting for how to send data
                     case "drink":
                         self.getDrinkOrder()
                     case "art":
-                        self.comms.artWorkInfo()
+                        self.comms.artWorkInfo() # COMMAND CODE DONE
                     case "walk":
-                        self.comms.modeChange(1)
+                        self.comms.modeChange(1) # Waiting for how to send data
                     case "charge":
-                        self.comms.modeChange(2)
+                        self.comms.modeChange(2) # Face Change / Waiting for how to send data
                     case "table":
                         table = self.getTable()
-                        self.comms.goToTable(table)
-                            # self.tableCommands(words)
+                        self.comms.goToTable(table) # Waiting for how to send data
                     case "status":
-                        self.comms.tableStatus()
+                        self.comms.tableStatus() # COMMAND CODE DONE
                     case "waiter":
                         currentPosition = [0,0,0] # Get currentPosition value and pass it in
-                        self.comms.callWaiter(currentPosition)
+                        self.comms.callWaiter(currentPosition) # Face Change / Waiting for how to send data
                     case "fact":
-                        self.comms.funFact()
+                        self.comms.funFact() # COMMAND CODE DONE
                     case "dance":
-                        self.comms.modeChange(3)
+                        self.comms.modeChange(3) # Waiting for how to send data
                     case _:
                         # print("Not a command word")
                         pass
@@ -104,6 +121,7 @@ class SpeechToText:
         table = 0
         ordering = True
         while ordering:
+            self.listeningEnabled = False
             self.comms.SpeakText("what drink would you like?")
             ogText = self.audioRecording(self.deviceNum, "Drink Order", 1)
             drinkRegistered = False
@@ -143,18 +161,22 @@ class SpeechToText:
             else:
                 pass
         
+        self.listeningEnabled = True
         self.comms.SpeakText("Drink Order Sent")
         self.comms.sendDrinkOrder(drinks, table)
 
     def getTable(self):
+        self.listeningEnabled = False
         print("In get Table")
         self.comms.SpeakText("which table should I go to?")
         response = self.audioRecording(self.deviceNum, "GetTable", 1)
-        response_words = response.split()
-        for word in response_words:
-            if word.isdigit():
-                if int(word) < len(self.tables):
-                    return int(word)
+        if response != None:
+            response_words = response.split()
+            for word in response_words:
+                if word.isdigit():
+                    if int(word) < self.numOfTables:
+                        self.listeningEnabled = True
+                        return int(word)
                 
     def audioRecording(self, device, function, promptNum):
         # validResponse = False
@@ -207,18 +229,19 @@ class SpeechToText:
                         else:
                             return None  # Stop if no speech is recognized
 
-    def run(self):
-        while True:
-            if TESTING_MODE:
-                self.processText("",testing=True)
-            else:
-                print(self.device.get_default_input_device_info())
-                while(1):
-                    recordedText = self.audioRecording(self.deviceNum, "Run", 1)
-                    # if recordedText != None:
-                    #     usableText = recordedText
-                    if recordedText != None:
-                        self.processText(recordedText)
+    # def run(self):
+    #     while True:
+    #         if TESTING_MODE:
+    #             self.processText("",testing=True)
+            # else:
+            #     while(1):
+            #         recordedText = self.audioRecording(self.deviceNum, "Run", 1)
+            #         # if recordedText != None:
+            #         #     usableText = recordedText
+            #         if recordedText != None:
+            #             self.processText(recordedText)
 
-stt = SpeechToText()
-stt.run()
+if __name__ == "__main__":
+    stt = SpeechToText()
+    stt.comms.root.mainloop()
+    # stt.run()
