@@ -4,8 +4,11 @@ import pyaudio
 from commands import Commands
 # spoken = False
 
+TESTING_MODE = True
+
 class SpeechToText:
     tables = [1,2,3,4,5]
+    numbers = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
 
     def __init__(self):
         # initialising a recnogiser
@@ -13,77 +16,128 @@ class SpeechToText:
         # creating pyaudio object so debugging
         self.device = pyaudio.PyAudio()
         self.comms = Commands()
+        self.deviceNum = self.device.get_default_input_device_info()["index"]
 
     # # Convert Text to Speech
-    # def SpeakText(command):
+    # def SpeakText(command):9
     #     engine = pyttsx3.init()
     #     engine.say(command)
     #     # The say function does not work without a run and wait command
     #     engine.runAndWait()
 
-    def processText(self,text):
+    def processText(self, text, testing = False):
         print("processing")
-        words = text.split()
-        for word in words:
-            match word:
-                case "greet":
-                    self.comms.modeChange(0)
-                case "drink":
-                    self.getDrinkOrder()
-                case "art":
-                    self.comms.artWorkInfo()
-                case "wander":
-                    self.comms.modeChange(1)
-                case "charge":
-                    self.comms.modeChange(2)
-                case "table":
-                    table = self.getTable()
-                    self.comms.goToTable(table)
-                        # self.tableCommands(words)
+        if testing == False:
+            words = text.split()
+            for word in words:
+                match word:
+                    case "greeting":
+                        self.comms.modeChange(0)
+                    case "drink":
+                        self.getDrinkOrder()
+                    case "art":
+                        self.comms.artWorkInfo()
+                    case "walk":
+                        self.comms.modeChange(1)
+                    case "charge":
+                        self.comms.modeChange(2)
+                    case "table":
+                        table = self.getTable()
+                        self.comms.goToTable(table)
+                            # self.tableCommands(words)
+                    case "status":
+                        self.comms.tableStatus()
+                    case "waiter":
+                        currentPosition = [0,0,0] # Get currentPosition value and pass it in
+                        self.comms.callWaiter(currentPosition)
+                    case "fact":
+                        self.comms.funFact()
+                    case "dance":
+                        self.comms.modeChange(3)
+                    case _:
+                        # print("Not a command word")
+                        pass
+        else:
+            print("1: Greet Guests\n2: Order a Drink\n3: Tell me about the art\n4: Wander Around\n"
+            "5: Go to Charging Station\n6: Go to a Table\n7: Get Table Status\n8: Call a waiter\n9: Tell me a Fun Fact\n10: Do a Dance")
+            commandNum = int(input("Which Command: "))
+            match commandNum:
+                    case 1:
+                        self.comms.modeChange(0)
+                    case 2:
+                        self.getDrinkOrder()
+                    case 3:
+                        self.comms.artWorkInfo()
+                    case 4:
+                        self.comms.modeChange(1)
+                    case 5:
+                        self.comms.modeChange(2)
+                    case 6:
+                        table = self.getTable()
+                        self.comms.goToTable(table)
+                            # self.tableCommands(words)
+                    case 7:
+                        self.comms.tableStatus()
+                    case 8:
+                        currentPosition = [0,0,0] # Get currentPosition value and pass it in
+                        self.comms.callWaiter(currentPosition)
+                    case 9:
+                        self.comms.funFact()
+                    case 10:
+                        self.comms.modeChange(3)
+                    case _:
+                        # print("Not a command word")
+                        pass
 
-                case "waiter":
-                    currentPosition = [0,0,0] # Get currentPosition value and pass it in
-                    self.comms.callWaiter(currentPosition)
-                case "fact":
-                    self.comms.funFact()
-                case "dance":
-                    self.comms.modeChange(3)
-                case _:
-                    # print("Not a command word")
-                    pass
     
-    def tableCommands(self, sentence):
-        print("In table commands function")
-        if sentence == "table status":
-            self.comms.tableStatus()
-        elif sentence == "go to table":
-            table = self.getTable()
-            self.comms.goToTable(table)
+    # def tableCommands(self, sentence):
+    #     print("In table commands function")
+    #     if sentence == "table status":
+    #         self.comms.tableStatus()
+    #     elif sentence == "go to table":
+    #         table = self.getTable()
+    #         self.comms.goToTable(table)
     
     def getDrinkOrder(self):
         print("Drink Order Command")
-        drinks = [0,0,0]
+        drinks = [["Carlton",0],["Soda", 0],["Champagne", 0]]
         table = 0
         ordering = True
         while ordering:
             self.comms.SpeakText("what drink would you like?")
-            text = self.audioRecording(12, "Drink Order", 1)
-            match text:
-                case "carlton":
-                    self.comms.SpeakText("How many would you like?")
-                    amount = self.audioRecording(12, "Drink Order, Carlton", 2)
-                    drinks[0] = amount
-                case "soda":
-                    self.comms.SpeakText("How many would you like?")
-                    amount = self.audioRecording(12, "Drink Order, Soda", 2)
-                    drinks[1] = amount
-                case "wine":
-                    self.comms.SpeakText("How many would you like?")
-                    amount = self.audioRecording(12, "Drink Order, Wine", 2)
-                    drinks[1] = amount
+            ogText = self.audioRecording(self.deviceNum, "Drink Order", 1)
+            drinkRegistered = False
+            # if ogText != None:
+            textSplit = ogText.split()
 
+            for text in textSplit:
+                match text:
+                    case "carlton":
+                        self.comms.SpeakText("How many would you like?")
+                        amount = self.audioRecording(self.deviceNum, "Drink Order, Carlton", 2)
+                        for word in amount.split():
+                            if word in self.numbers or amount.isdigit():
+                                drinks[0][1] = word
+                        drinkRegistered = True
+                    case "soft":
+                        self.comms.SpeakText("How many would you like?")
+                        amount = self.audioRecording(self.deviceNum, "Drink Order, Soda", 2)
+                        for word in amount.split():
+                            if word in self.numbers or amount.isdigit():
+                                drinks[1][1] = word
+                        drinkRegistered = True
+                    case "champagne":
+                        self.comms.SpeakText("How many would you like?")
+                        amount = self.audioRecording(self.deviceNum, "Drink Order, Champagne", 2)
+                        for word in amount.split():
+                            if word in self.numbers or amount.isdigit():
+                                drinks[2][1] = word
+                        drinkRegistered = True
+                    case _:
+                        drinkRegistered = False
+            
             self.comms.SpeakText("would you like another drink?")
-            response = self.audioRecording(12,"Drink Order", 3)
+            response = self.audioRecording(self.deviceNum,"Drink Order", 3)
             if response != "yes":
                 ordering = False
             else:
@@ -95,7 +149,7 @@ class SpeechToText:
     def getTable(self):
         print("In get Table")
         self.comms.SpeakText("which table should I go to?")
-        response = self.audioRecording(12, "GetTable", 1)
+        response = self.audioRecording(self.deviceNum, "GetTable", 1)
         response_words = response.split()
         for word in response_words:
             if word.isdigit():
@@ -103,41 +157,68 @@ class SpeechToText:
                     return int(word)
                 
     def audioRecording(self, device, function, promptNum):
-        validResponse = False
-        while(validResponse == False):
-            try:
-                with sr.Microphone(device_index=device) as source2:
-                    # wait for a second to let the recognizer
-                    # adjust the energy threshold based on
-                    # the surrounding noise level 
-                    self.r.adjust_for_ambient_noise(source2, duration=0.2)
+        # validResponse = False
+        # while(validResponse == False):
+        #     try:
+        #         with sr.Microphone(device_index=device) as source2:
+        #             # wait for a second to let the recognizer
+        #             # adjust the energy threshold based on
+        #             # the surrounding noise level 
+        #             self.r.adjust_for_ambient_noise(source2, duration=0.2)
 
-                    #listens for the user's input 
+        #             #listens for the user's input 
+        #             audio2 = self.r.listen(source2)
+
+        #             # Using google to recognize audio
+        #             MyText = self.r.recognize_google(audio2)
+        #             MyText = MyText.lower()
+
+        #             print(function + " prompt #" + str(promptNum) + " response is: ", MyText)
+        #             if MyText != None:
+        #                 validResponse = True
+        #                 return MyText
+        #             # SpeakText(MyText)
+
+            with sr.Microphone(device_index=device) as source2:
+                self.r.adjust_for_ambient_noise(source2, duration=0.5)  # Adjust to background noise
+                print("Listening...")
+
+                # Continuously listen for speech and stop when silence is detected
+                while True:
                     audio2 = self.r.listen(source2)
+                    try:
+                        MyText = self.r.recognize_google(audio2).lower()
+                        print(f"Detected speech: {MyText}")
 
-                    # Using google to recognize audio
-                    MyText = self.r.recognize_google(audio2)
-                    MyText = MyText.lower()
+                        if MyText != None:  # If text is not empty
+                            print(function + " prompt #" + str(promptNum) + " response is: ", MyText)
+                            return MyText  # Stop recording and return text
 
-                    print(function + " prompt #" + str(promptNum) + " response is: ", MyText)
-                    if MyText != None:
-                        validResponse = True
-                        return MyText
-                    # SpeakText(MyText)
 
-            except sr.RequestError as e:
-                print("Could not request results; {0}".format(e))
+                    except sr.RequestError as e:
+                        print("Could not request results; {0}".format(e))
 
-            except sr.UnknownValueError:
-                print("unknown error occurred")
+                    except sr.UnknownValueError:
+                        # print("unknown error occurred")
+                        print("Silence detected, stopping recording...")
+                        retry = self.audioRecording(device,function,promptNum)
+                        if retry != None:
+                            return retry
+                        else:
+                            return None  # Stop if no speech is recognized
 
     def run(self):
-        print(self.device.get_default_input_device_info())
-        while(1):
-            recordedText = self.audioRecording(12, "Run", 1)
-            # if recordedText != None:
-            #     usableText = recordedText
-            self.processText(recordedText)
+        while True:
+            if TESTING_MODE:
+                self.processText("",testing=True)
+            else:
+                print(self.device.get_default_input_device_info())
+                while(1):
+                    recordedText = self.audioRecording(self.deviceNum, "Run", 1)
+                    # if recordedText != None:
+                    #     usableText = recordedText
+                    if recordedText != None:
+                        self.processText(recordedText)
 
 stt = SpeechToText()
 stt.run()
