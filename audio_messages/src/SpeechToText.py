@@ -5,15 +5,18 @@ from commands import Commands
 # from tableOrganisation import TableDatabase
 import threading
 from PIL import Image
+from rclpy.node import Node
+import rclpy
 # spoken = False
 
 TESTING_MODE = True
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
-class SpeechToText:
+class SpeechToText(Node):
     numbers_words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 
     def __init__(self):
+        super().__init__('speech_to_text')
         # initialising a recnogiser
         self.r = sr.Recognizer()
         # creating pyaudio object so debugging
@@ -23,7 +26,7 @@ class SpeechToText:
 
         self.availabledrinks = Image.open("audio_messages/src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
 
-        self.comms = Commands()
+        self.comms = Commands(self)
         self.numOfTables = self.comms.getNumofTables()
         # imagesThread = threading.Thread(target=self.comms.runGUI, daemon=True)
         # imagesThread.start()
@@ -273,7 +276,15 @@ class SpeechToText:
             #         if recordedText != None:
             #             self.processText(recordedText)
 
+def main(args=None):
+    rclpy.init(args=args)
+    node = SpeechToText()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
 if __name__ == "__main__":
-    stt = SpeechToText()
-    stt.comms.root.mainloop()
+    main()
+    # stt = SpeechToText()
+    # stt.comms.root.mainloop()
     # stt.run()

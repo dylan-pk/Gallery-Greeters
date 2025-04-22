@@ -7,13 +7,16 @@ from PIL import Image, ImageTk, ImageDraw, ImageFont
 import tkinter as tk
 from tableOrganisation import TableDatabase
 from screeninfo import get_monitors
+from nav_msgs.msg import Odometry
 
 DURATION = 2000
 WPM = 160
 
 class Commands:
 
-    def __init__(self):
+    def __init__(self, node):
+        self.node = node # saved for reference
+
         self.device = pyaudio.PyAudio()
         # initialising a recogniser
         self.r = sr.Recognizer()
@@ -22,6 +25,13 @@ class Commands:
         self.engine.setProperty('rate',WPM)
         voices = self.engine.getProperty('voices')
         self.engine.setProperty('voice', voices[19].id) 
+
+        ## ROS Topics and stuff
+        self.subscriber_currentPos = node.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        # self.service_artIdentification
+        # self.publisher_drinkOrders
+        # self.publisher_movementMode
+        # self.publisher_location
 
         monitor = get_monitors()[1] # this will allow us to put it on the second screen
         self.root = tk.Tk()
@@ -48,6 +58,7 @@ class Commands:
         self.fullScreenImage(self.default_image,10) 
         # self.runGUI()   
 
+################################################################### Base Functionality Code #########################################################################
     def getNumofTables(self):
         return self.tables.getNumofTables()
     
@@ -102,7 +113,14 @@ class Commands:
         self.engine.runAndWait()
         time.sleep(0.25)
 
-    ########################################################## SPECIFIC COMMAND FUNCTONS ##########################################################################
+#################################################################### ROS CALLBACKS ################################################################################
+    def odom_callback(self, msg):
+        position = msg.pose.pose.position
+        orientation = msg.pose.pose.orientation
+        print(f"Position: x = {position.x}, y = {position.y}, z = {position.z}")
+        print(f"Orientation: x = {orientation.x}, y = {orientation.y}, z = {orientation.z}, w = {orientation.w}")
+        self.currentPos = [[position.x, position.y, position.z], [orientation.x, orientation.y, orientation.z, orientation.w]]
+############################################################## SPECIFIC COMMAND FUNCTONS ##########################################################################
     
     def modeChange(self, mode):
         match mode:
