@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/lachlan/ros2_ws/src/turtlebot_nav/src/nav_to_goal2.cpp" "CMakeFiles/nav_to_goal2.dir/src/nav_to_goal2.cpp.o" "gcc" "CMakeFiles/nav_to_goal2.dir/src/nav_to_goal2.cpp.o.d"
+  "/home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/src/nav_to_goal2.cpp" "CMakeFiles/nav_to_goal2.dir/src/nav_to_goal2.cpp.o" "gcc" "CMakeFiles/nav_to_goal2.dir/src/nav_to_goal2.cpp.o.d"
   )
 
 # Targets to which this target links.
