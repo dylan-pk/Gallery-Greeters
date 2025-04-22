@@ -5,8 +5,12 @@
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include "geometry_msgs/msg/pose_stamped.hpp"
+#include "nav_msgs/msg/path.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include <cmath>
+#include <algorithm>
+#include "obstacle_avoidance.hpp"
 
 /**
  * @class P Controller
@@ -19,7 +23,7 @@ class pController : public rclcpp::Node
         /**
          * @brief Constructor for the P controller node
          */
-        pController(double x_target, double y_target);
+        pController(ObstacleAvoidance& obstacleavoidance);
 
     private:
     
@@ -30,7 +34,21 @@ class pController : public rclcpp::Node
      */
     void odom_callback(const nav_msgs::msg::Odometry::SharedPtr odom);
 
+    void path_callback(const nav_msgs::msg::Path::SharedPtr path);
+
+    void move();
+
+    // double getDistanceError();
+
+    // double getAngularError();
+
+    double getDistanceError(const geometry_msgs::msg::PoseStamped &goal);
+    double getAngularError(const geometry_msgs::msg::PoseStamped &goal);
+
+    nav_msgs::msg::Odometry getOdometry(void);
+
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_; ///< Subscription to laser scan data.
+    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_; ///< Subscription to planned path.
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_; ///< Publisher for command velocity.
 
     double Kp_linear;
@@ -38,6 +56,13 @@ class pController : public rclcpp::Node
     double target_x;
     double target_y;
     double tolerance;
+    nav_msgs::msg::Odometry odo_;
+    nav_msgs::msg::Path path_;
+    size_t path_index_ = 0;
+
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    ObstacleAvoidance& obstacleavoidance_;
 };
 
 #endif // PCONTROLLER_HPP
