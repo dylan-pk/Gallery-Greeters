@@ -6,8 +6,9 @@ import time
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 import tkinter as tk
 from tableOrganisation import TableDatabase
+from screeninfo import get_monitors
 
-DURATION = 3000
+DURATION = 2000
 WPM = 160
 
 class Commands:
@@ -22,18 +23,20 @@ class Commands:
         voices = self.engine.getProperty('voices')
         self.engine.setProperty('voice', voices[19].id) 
 
-
+        monitor = get_monitors()[1] # this will allow us to put it on the second screen
         self.root = tk.Tk()
 
         ## Data needed to make images halfscreen
-        self.screen_width = self.root.winfo_screenwidth()
-        self.screen_height = self.root.winfo_screenheight()
-        # Half size
-        self.half_width = self.screen_width // 2
-        self.half_height = self.screen_height // 2
+        # self.screen_width = self.root.winfo_screenwidth()
+        # self.screen_height = self.root.winfo_screenheight()
+        # # Half size
+        # self.half_width = self.screen_width // 2
+        # self.half_height = self.screen_height // 2
+        # self.root.geometry(f"{self.half_width}x{self.half_height}")
         
         # Establishing the root used
-        self.root.geometry(f"{self.half_width}x{self.half_height}")
+        self.root.geometry(f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}") # attaching the root to the second screen
+        self.root.attributes('-fullscreen', True)
         self.root.bind("<Escape>", lambda e: self.root.destroy())
         
         ## Establishing all the images
@@ -42,7 +45,7 @@ class Commands:
         self.tk_default_image = ImageTk.PhotoImage(self.default_image)
         self.label = tk.Label(self.root, image=self.tk_default_image)
         self.label.pack(expand=True)    
-        self.fullScreenImage(self.default_image) 
+        self.fullScreenImage(self.default_image,10) 
         # self.runGUI()   
 
     def getNumofTables(self):
@@ -51,41 +54,44 @@ class Commands:
     def speakingTimeEst(self, text):
         words = len(text.split())
         wps = WPM / 60
-        return int((words / wps) * 1000)
+        return int(((words / wps)+0.25) * 1000)
         
     def loadInfo(self):
         # Robot Faces
-        self.default_image = Image.open("src/resources/default.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        self.dancingFace = Image.open("src/resources/danceFace.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        self.chargeFace = Image.open("src/resources/chargeFace.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        self.callingFace = Image.open("src/resources/callingWaiter.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.default_image = Image.open("audio_messages/src/resources/default.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.dancingFace = Image.open("audio_messages/src/resources/danceFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.chargeFace = Image.open("audio_messages/src/resources/chargeFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.callingFace = Image.open("audio_messages/src/resources/callingWaiter.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
 
         # Information about Artwork        
-        with open("src/resources/ArtworkInfo/artworkInfo.txt", "r") as artFile:
+        with open("audio_messages/src/resources/ArtworkInfo/artworkInfo.txt", "r") as artFile:
             self.artworks = artFile.readline().split("/")
             self.artInfo = artFile.readlines()
-        self.artImages = {a: Image.open(f"src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.artImages = {a: Image.open(f"audio_messages/src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
                            for a in range(5)}
 
         # Fun Facts
-        with open("src/resources/FunFacts/funfacts.txt", "r") as factFile:
+        with open("audio_messages/src/resources/FunFacts/funfacts.txt", "r") as factFile:
             self.facts = factFile.readlines()
-        self.factImages = {i: Image.open(f"src/resources/FunFacts/image{i}.png").resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.factImages = {i: Image.open(f"audio_messages/src/resources/FunFacts/image{i}.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
                            for i in range(10)}
         
         # Table Database
-        self.tables = TableDatabase("src/resources/tableInfo.txt")
+        self.tables = TableDatabase("audio_messages/src/resources/tableInfo.txt")
 
     def runGUI(self):
         self.root.mainloop()
 
-    def fullScreenImage(self, newImage, duration=4000):
+    def fullScreenImage(self, newImage, duration=4000, manualReset = False):
+        # print(duration)
         tk_image = ImageTk.PhotoImage(newImage)
         self.label.configure(image=tk_image)
         self.label.image = tk_image
-        self.root.after(duration, self.resetToDefault)
+        if manualReset == False:
+            self.root.after(duration, self.resetToDefault)
 
     def resetToDefault(self):
+        # print("reseting to default")
         self.label.configure(image=self.tk_default_image)
         self.label.image = self.tk_default_image
 
@@ -125,8 +131,8 @@ class Commands:
     def artWorkInfo(self):
         # Read closest artwork from publisher
         print("Artwork Info Command Registered")
-        print(f"1: {self.artworks[0]}\n2: {self.artworks[1]}\n3: {self.artworks[2]}\n4: {self.artworks[3]}\n5: {self.artworks[4]}")
-        artwork = int(input("Artwork: "))
+        # print(f"1: {self.artworks[0]}\n2: {self.artworks[1]}\n3: {self.artworks[2]}\n4: {self.artworks[3]}\n5: {self.artworks[4]}")
+        artwork = int(input("Artwork: ")) # This will be changed to recieve the name of the painting from the visual subsystem
         if artwork == self.artworks[0] or artwork == 1: # The Ugly Duchess
                 self.fullScreenImage(self.artImages[0], (self.speakingTimeEst(self.artInfo[0]) + DURATION))
                 self.SpeakText(self.artInfo[0].lower())
@@ -149,10 +155,10 @@ class Commands:
         self.fullScreenImage(statusImage, DURATION)
 
     def callWaiter(self, location):
-        print(f"Call Waiter Command Recognised, Location is {location}")
+        table = self.tables.getClosestTable(location)
+        print(f"Call Waiter Command Recognised, calling to table {table}")
+        self.fullScreenImage(self.callingFace)
         self.SpeakText("calling a waiter here")
-        self.fullScreenImage(self.callingFace, DURATION)
-        
 
     def goToTable(self, table):
         tableLocation = self.tables.findTableLocation(table)
@@ -163,8 +169,8 @@ class Commands:
         factNum = random.randint(0,9)
         # Outputting the fact image and audio
         print("Fun Fact " + self.facts[factNum])
+        self.fullScreenImage(self.factImages[factNum],(self.speakingTimeEst(self.facts[factNum]) + DURATION))
         self.SpeakText(self.facts[factNum])
-        self.fullScreenImage(self.factImages[factNum],(self.speakingTimeEst(self.facts[factNum])+DURATION))
         
         
 
