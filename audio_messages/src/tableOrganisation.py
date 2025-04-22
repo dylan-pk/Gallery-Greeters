@@ -1,5 +1,6 @@
 from table import Table
 from PIL import Image, ImageDraw, ImageFont, ImageTk
+import math
 
 class TableDatabase:
     def __init__(self, tableInfoFile):
@@ -10,7 +11,7 @@ class TableDatabase:
         i = 0
         for line in tablesInfo:
             info = line.split("/")
-            self.tables.append(Table(info[0], [info[1], info[2]], info[3]))
+            self.tables.append(Table(int(info[0]), [float(info[1]), float(info[2])], int(info[3])))
             if len(info) == 5:
                 self.tables[i].addOccupants(int(info[4]))
             i = i + 1
@@ -25,7 +26,19 @@ class TableDatabase:
                 return table.getLocation()
             else:
                 continue
-        
+    
+    def getClosestTable(self, location):
+        minDistance = 10000000
+        closestTable = 0
+        for table in self.tables:
+            tableLoc = table.getLocation()
+            distance = math.sqrt(math.pow(location[0] - tableLoc[0], 2) + math.pow(location[1] - tableLoc[1], 2))
+            if distance < minDistance:
+                minDistance = distance
+                closestTable = table.getTableNum()
+        return closestTable
+            
+
     def getNumofTables(self):
         return len(self.tables)
     
@@ -49,7 +62,7 @@ class TableDatabase:
 
         # Optional: Load a font
         try:
-            font = ImageFont.truetype("src/fonts/SpecialGothic-Regular.ttf", 30)
+            font = ImageFont.truetype("audio_messages/src/fonts/SpecialGothic-Regular.ttf", 30)
         except:
             font = ImageFont.load_default()
     

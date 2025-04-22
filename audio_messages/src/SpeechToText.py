@@ -4,15 +4,19 @@ import pyaudio
 from commands import Commands
 # from tableOrganisation import TableDatabase
 import threading
+from PIL import Image
+from rclpy.node import Node
+import rclpy
 # spoken = False
 
 TESTING_MODE = True
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
-class SpeechToText:
-    numbers = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+class SpeechToText(Node):
+    numbers_words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 
     def __init__(self):
+        super().__init__('speech_to_text')
         # initialising a recnogiser
         self.r = sr.Recognizer()
         # creating pyaudio object so debugging
@@ -20,7 +24,9 @@ class SpeechToText:
         print(self.device.get_default_input_device_info())
         self.deviceNum = self.device.get_default_input_device_info()["index"]
 
-        self.comms = Commands()
+        self.availabledrinks = Image.open("audio_messages/src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+
+        self.comms = Commands(self)
         self.numOfTables = self.comms.getNumofTables()
         # imagesThread = threading.Thread(target=self.comms.runGUI, daemon=True)
         # imagesThread.start()
@@ -45,6 +51,7 @@ class SpeechToText:
 
     def processText(self, text, testing = False):
         print("processing")
+        self.listeningEnabled = False
         if testing == False:
             words = text.split()
             for word in words:
@@ -105,6 +112,7 @@ class SpeechToText:
                     case _:
                         # print("Not a command word")
                         pass
+        self.listeningEnabled = True
 
     
     # def tableCommands(self, sentence):
@@ -120,50 +128,77 @@ class SpeechToText:
         drinks = [["Carlton",0],["Soda", 0],["Champagne", 0]]
         table = 0
         ordering = True
-        while ordering:
-            self.listeningEnabled = False
-            self.comms.SpeakText("what drink would you like?")
-            ogText = self.audioRecording(self.deviceNum, "Drink Order", 1)
-            drinkRegistered = False
-            # if ogText != None:
-            textSplit = ogText.split()
-
+        self.comms.fullScreenImage(self.availabledrinks, manualReset=True)
+        while True:
+            while ordering:
+                self.listeningEnabled = False
+                self.comms.SpeakText("what drink would you like")
+                ogText = self.audioRecording(self.deviceNum, "Drink Order", 1)
+                drinkRegistered = False
+                if ogText != None:
+                    textSplit = ogText.split()
+                    ordering = False
+                
             for text in textSplit:
                 match text:
                     case "carlton":
-                        self.comms.SpeakText("How many would you like?")
-                        amount = self.audioRecording(self.deviceNum, "Drink Order, Carlton", 2)
-                        for word in amount.split():
-                            if word in self.numbers or amount.isdigit():
-                                drinks[0][1] = word
+                        drinkIdx = 0
                         drinkRegistered = True
+                        break
                     case "soft":
-                        self.comms.SpeakText("How many would you like?")
-                        amount = self.audioRecording(self.deviceNum, "Drink Order, Soda", 2)
-                        for word in amount.split():
-                            if word in self.numbers or amount.isdigit():
-                                drinks[1][1] = word
+                        drinkIdx = 1
                         drinkRegistered = True
+                        break
                     case "champagne":
-                        self.comms.SpeakText("How many would you like?")
-                        amount = self.audioRecording(self.deviceNum, "Drink Order, Champagne", 2)
-                        for word in amount.split():
-                            if word in self.numbers or amount.isdigit():
-                                drinks[2][1] = word
+                        drinkIdx = 2
                         drinkRegistered = True
+                        break
+                        
                     case _:
                         drinkRegistered = False
-            
+
+            if drinkRegistered == False:
+                self.comms.SpeakText("we do not have that drink sorry")
+            else:
+                # amount = self.drinksAmount()
+                self.comms.SpeakText("How many would you like")
+                amount = self.audioRecording(self.deviceNum, "Drink Order, Amount", 2)
+                # while amountregistered == False:
+                for word in amount.split():
+                    if word in self.numbers_words:
+                        number = self.numbers_words[word]
+                    elif word.isdigit():
+                        number = word
+                    else:
+                        pass
+                
+                drinks[drinkIdx][1] = number
+
             self.comms.SpeakText("would you like another drink?")
             response = self.audioRecording(self.deviceNum,"Drink Order", 3)
             if response != "yes":
-                ordering = False
+                break
             else:
                 pass
         
+        self.comms.resetToDefault()
         self.listeningEnabled = True
         self.comms.SpeakText("Drink Order Sent")
         self.comms.sendDrinkOrder(drinks, table)
+    
+    def drinksAmount(self):
+        # amountregistered = False
+        self.comms.SpeakText("How many would you like")
+        amount = self.audioRecording(self.deviceNum, "Drink Order, Carlton", 2)
+        # while amountregistered == False:
+        for word in amount.split():
+            if word in self.numbers_words:
+                number = self.numbers_words[word]
+            elif word.isdigit():
+                number = word
+            else:
+                pass
+        return number
 
     def getTable(self):
         self.listeningEnabled = False
@@ -241,7 +276,15 @@ class SpeechToText:
             #         if recordedText != None:
             #             self.processText(recordedText)
 
+def main(args=None):
+    rclpy.init(args=args)
+    node = SpeechToText()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
 if __name__ == "__main__":
-    stt = SpeechToText()
-    stt.comms.root.mainloop()
+    main()
+    # stt = SpeechToText()
+    # stt.comms.root.mainloop()
     # stt.run()
