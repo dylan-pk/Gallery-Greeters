@@ -1,0 +1,2 @@
+/usr/bin/ar qc libobstacle_avoidance.a CMakeFiles/obstacle_avoidance.dir/src/obstacle_avoidance.cpp.o
+/usr/bin/ranlib libobstacle_avoidance.a

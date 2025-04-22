@@ -1,0 +1,12 @@
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/uninstall.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/p_controller_uninstall.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/p_controller.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/test_path_publisher.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/obstacle_avoidance.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/test.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/edit_cache.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/rebuild_cache.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/list_install_components.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/install.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/install/local.dir
+/home/alec/ros2_ws/src/pController/build/CMakeFiles/install/strip.dir
