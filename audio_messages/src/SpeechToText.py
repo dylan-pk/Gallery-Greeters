@@ -7,7 +7,7 @@ import threading
 from PIL import Image
 # spoken = False
 
-TESTING_MODE = False
+TESTING_MODE = True
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
 class SpeechToText:
