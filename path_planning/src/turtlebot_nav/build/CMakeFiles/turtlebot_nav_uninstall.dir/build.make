@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/lachlan/ros2_ws/src/turtlebot_nav
+CMAKE_SOURCE_DIR = /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/lachlan/ros2_ws/src/turtlebot_nav/build
+CMAKE_BINARY_DIR = /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build
 
 # Utility rule file for turtlebot_nav_uninstall.
 
@@ -67,7 +67,7 @@ include CMakeFiles/turtlebot_nav_uninstall.dir/compiler_depend.make
 include CMakeFiles/turtlebot_nav_uninstall.dir/progress.make
 
 CMakeFiles/turtlebot_nav_uninstall:
-	/usr/bin/cmake -P /home/lachlan/ros2_ws/src/turtlebot_nav/build/ament_cmake_uninstall_target/ament_cmake_uninstall_target.cmake
+	/usr/bin/cmake -P /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/ament_cmake_uninstall_target/ament_cmake_uninstall_target.cmake
 
 turtlebot_nav_uninstall: CMakeFiles/turtlebot_nav_uninstall
 turtlebot_nav_uninstall: CMakeFiles/turtlebot_nav_uninstall.dir/build.make
@@ -82,6 +82,6 @@ CMakeFiles/turtlebot_nav_uninstall.dir/clean:
 .PHONY : CMakeFiles/turtlebot_nav_uninstall.dir/clean
 
 CMakeFiles/turtlebot_nav_uninstall.dir/depend:
-	cd /home/lachlan/ros2_ws/src/turtlebot_nav/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/lachlan/ros2_ws/src/turtlebot_nav /home/lachlan/ros2_ws/src/turtlebot_nav /home/lachlan/ros2_ws/src/turtlebot_nav/build /home/lachlan/ros2_ws/src/turtlebot_nav/build /home/lachlan/ros2_ws/src/turtlebot_nav/build/CMakeFiles/turtlebot_nav_uninstall.dir/DependInfo.cmake --color=$(COLOR)
+	cd /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/CMakeFiles/turtlebot_nav_uninstall.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/turtlebot_nav_uninstall.dir/depend
 
