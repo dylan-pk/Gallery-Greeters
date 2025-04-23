@@ -65,17 +65,27 @@ private:
     std::atomic<bool> running_;
     bool goal_active_;
     std::mutex goal_mutex_;
+    nav_msgs::msg::Odometry::SharedPtr latest_odom_;
+    std::mutex odom_mutex_;
+    
     // std::condition_variable cv_;
 
     void publish_initial_pose() {
+        std::lock_guard<std::mutex> lock(odom_mutex_);
+        if (!latest_odom_) {
+            RCLCPP_WARN(this->get_logger(), "No odometry data received yet. Skipping initial pose publish.");
+            return;
+        }
+    
         auto msg = geometry_msgs::msg::PoseWithCovarianceStamped();
         msg.header.stamp = this->now();
-        msg.header.frame_id = "map";
-        msg.pose.pose.position.x = -2.0;
-        msg.pose.pose.position.y = -0.5;
-        msg.pose.pose.position.z = 0.0;
-        msg.pose.pose.orientation.z = 0.0;
-        msg.pose.pose.orientation.w = 1.0;
+        msg.header.frame_id = "map";  // Make sure your TF tree supports map->odom transform
+    
+        // Use odometry position
+        msg.pose.pose.position = latest_odom_->pose.pose.position;
+        msg.pose.pose.orientation = latest_odom_->pose.pose.orientation;
+    
+        // Use a reasonable default covariance
         msg.pose.covariance = {
             0.25, 0, 0, 0, 0, 0,
             0, 0.25, 0, 0, 0, 0,
@@ -84,8 +94,28 @@ private:
             0, 0, 0, 0, 0.0685, 0,
             0, 0, 0, 0, 0, 0.0685
         };
+    
         initial_pose_pub_->publish(msg);
-        RCLCPP_INFO(this->get_logger(), "Published initial pose.");
+        RCLCPP_INFO(this->get_logger(), "Published initial pose from odometry.");
+        
+        // auto msg = geometry_msgs::msg::PoseWithCovarianceStamped();
+        // msg.header.stamp = this->now();
+        // msg.header.frame_id = "map";
+        // msg.pose.pose.position.x = -2.0;
+        // msg.pose.pose.position.y = -0.5;
+        // msg.pose.pose.position.z = 0.0;
+        // msg.pose.pose.orientation.z = 0.0;
+        // msg.pose.pose.orientation.w = 1.0;
+        // msg.pose.covariance = {
+        //     0.25, 0, 0, 0, 0, 0,
+        //     0, 0.25, 0, 0, 0, 0,
+        //     0, 0, 0.0, 0, 0, 0,
+        //     0, 0, 0, 0.0685, 0, 0,
+        //     0, 0, 0, 0, 0.0685, 0,
+        //     0, 0, 0, 0, 0, 0.0685
+        // };
+        // initial_pose_pub_->publish(msg);
+        // RCLCPP_INFO(this->get_logger(), "Published initial pose.");
     }
 
     void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
@@ -160,7 +190,8 @@ private:
     // }
 
     void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
-        // Not used directly but available for future use
+        std::lock_guard<std::mutex> lock(odom_mutex_);
+        latest_odom_ = msg;
     }
 };
 
