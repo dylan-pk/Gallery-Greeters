@@ -7,6 +7,7 @@ import threading
 from PIL import Image
 from rclpy.node import Node
 import rclpy
+from geometry_msgs.msg import PoseStamped
 # spoken = False
 
 TESTING_MODE = True
@@ -26,6 +27,7 @@ class SpeechToText(Node):
 
         self.availabledrinks = Image.open("audio_messages/src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
 
+        self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
         self.comms = Commands(self)
         self.numOfTables = self.comms.getNumofTables()
         # imagesThread = threading.Thread(target=self.comms.runGUI, daemon=True)

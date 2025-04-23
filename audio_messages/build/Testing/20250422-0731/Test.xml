@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Site BuildName="(empty)"
-	BuildStamp="20250422-0029-Experimental"
+	BuildStamp="20250422-0731-Experimental"
 	Name="alec-ThinkPad-P53s"
 	Generator="ctest-3.22.1"
 	CompilerName="/usr/bin/c++"
@@ -21,14 +21,14 @@
 	TotalVirtualMemory="2047"
 	TotalPhysicalMemory="15648"
 	LogicalProcessorsPerPhysical="2"
-	ProcessorClockFrequency="1399.96"
+	ProcessorClockFrequency="2900.02"
 	>
 	<Testing>
-		<StartDateTime>Apr 23 07:36 AEST</StartDateTime>
-		<StartTestTime>1745357778</StartTestTime>
+		<StartDateTime>Apr 22 17:42 AEST</StartDateTime>
+		<StartTestTime>1745307751</StartTestTime>
 		<TestList/>
-		<EndDateTime>Apr 23 07:36 AEST</EndDateTime>
-		<EndTestTime>1745357778</EndTestTime>
+		<EndDateTime>Apr 22 17:42 AEST</EndDateTime>
+		<EndTestTime>1745307751</EndTestTime>
 		<ElapsedMinutes>0</ElapsedMinutes>
 	</Testing>
 </Site>

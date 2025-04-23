@@ -10,7 +10,7 @@ pController::pController(ObstacleAvoidance& obstacleavoidance) : Node("p_control
         "/odom", 10, std::bind(&pController::odom_callback, this, std::placeholders::_1));
 
     path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
-        "computed_path", 10, std::bind(&pController::path_callback, this, std::placeholders::_1));\
+        "computed_path", 10, std::bind(&pController::path_callback, this, std::placeholders::_1));
     
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(100),
@@ -71,11 +71,11 @@ void pController::move()
             } else {
                 next_goal = path_.poses.at(path_index_);  // fallback to current goal
             }
-            
+
             geometry_msgs::msg::PoseStamped temporary_goal = obstacleavoidance_.suggestNewGoal(
                 path_.poses.at(path_index_), 
                 next_goal);
-            
+
             double dist_temp = getDistanceError(temporary_goal);
             double angle_temp = getAngularError(temporary_goal);
 
