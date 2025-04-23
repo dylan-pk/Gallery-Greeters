@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/lachlan/ros2_ws/src/turtlebot_nav
+CMAKE_SOURCE_DIR = /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/lachlan/ros2_ws/src/turtlebot_nav/build
+CMAKE_BINARY_DIR = /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build
 
 # Utility rule file for uninstall.
 
@@ -78,6 +78,6 @@ CMakeFiles/uninstall.dir/clean:
 .PHONY : CMakeFiles/uninstall.dir/clean
 
 CMakeFiles/uninstall.dir/depend:
-	cd /home/lachlan/ros2_ws/src/turtlebot_nav/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/lachlan/ros2_ws/src/turtlebot_nav /home/lachlan/ros2_ws/src/turtlebot_nav /home/lachlan/ros2_ws/src/turtlebot_nav/build /home/lachlan/ros2_ws/src/turtlebot_nav/build /home/lachlan/ros2_ws/src/turtlebot_nav/build/CMakeFiles/uninstall.dir/DependInfo.cmake --color=$(COLOR)
+	cd /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/CMakeFiles/uninstall.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/uninstall.dir/depend
 

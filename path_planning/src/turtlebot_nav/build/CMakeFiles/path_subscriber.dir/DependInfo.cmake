@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/lachlan/ros2_ws/src/turtlebot_nav/src/path_subscriber.cpp" "CMakeFiles/path_subscriber.dir/src/path_subscriber.cpp.o" "gcc" "CMakeFiles/path_subscriber.dir/src/path_subscriber.cpp.o.d"
+  "/home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/src/path_subscriber.cpp" "CMakeFiles/path_subscriber.dir/src/path_subscriber.cpp.o" "gcc" "CMakeFiles/path_subscriber.dir/src/path_subscriber.cpp.o.d"
   )
 
 # Targets to which this target links.

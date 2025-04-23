@@ -8,6 +8,8 @@ import tkinter as tk
 from tableOrganisation import TableDatabase
 from screeninfo import get_monitors
 from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseStamped
+from builtin_interfaces.msg import Time
 
 DURATION = 2000
 WPM = 160
@@ -33,7 +35,14 @@ class Commands:
         # self.publisher_movementMode
         # self.publisher_location
 
-        monitor = get_monitors()[1] # this will allow us to put it on the second screen
+        self.publisher_location = node.goal_pub
+
+        # monitor = get_monitors()[1] # this will allow us to put it on the second screen
+        monitors = get_monitors()
+        if len(monitors) > 1:
+            monitor = monitors[1]
+        else:
+            monitor = monitors[0]
         self.root = tk.Tk()
 
         ## Data needed to make images halfscreen
@@ -182,6 +191,14 @@ class Commands:
         tableLocation = self.tables.findTableLocation(table)
         self.SpeakText(f"follow me to table {str(table)}")
         print(f"Go To Table Command Recognised, Table Location is: {tableLocation}")
+        goal = PoseStamped()
+        goal.header.frame_id = "map"
+        goal.header.stamp = self.node.get_clock().now().to_msg() 
+        goal.pose.position.x = tableLocation[0]
+        goal.pose.position.y = tableLocation[1]
+        goal.pose.orientation.w = 1.0
+        self.publisher_location.publish(goal)
+
 
     def funFact(self):
         factNum = random.randint(0,9)

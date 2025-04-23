@@ -29,7 +29,7 @@ function(ament_cmake_uninstall_target_remove_empty_directories path)
 endfunction()
 
 # uninstall files installed using the standard install() function
-set(install_manifest "/home/lachlan/ros2_ws/src/turtlebot_nav/build/install_manifest.txt")
+set(install_manifest "/home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/install_manifest.txt")
 if(NOT EXISTS "${install_manifest}")
   message(FATAL_ERROR "Cannot find install manifest: ${install_manifest}")
 endif()

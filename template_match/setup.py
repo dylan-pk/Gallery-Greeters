@@ -9,19 +9,24 @@ setup(
     version='0.0.1',
     packages=[package_name],
     data_files=[
-    ('resource/' + package_name, ['package.xml']),
-    ('resources/' + package_name + '/resource', glob('resources/*')),  # Image files in resource
+        # Required for ROS 2 package discovery via ament_index
+        (f'share/ament_index/resource_index/packages', [f'resource/{package_name}']),
+        
+        # Required to install your package metadata
+        (f'share/{package_name}', ['package.xml']),
+
+        # Include everything inside the 'resource' folder (like template.jpg)
+        (f'share/{package_name}/resource', glob('resource/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='dylan',
-    maintainer_email='dylan.m.purbrick-1@student.uts.edu.au',
-    description='Template matching package for ROS2',
+    maintainer_email='dylan@example.com',
+    description='A ROS 2 package for template matching using OpenCV.',
     license='Apache License 2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'match_node = template_match:main',
+            'template_match = template_match.template_match:main',
         ],
     },
 )

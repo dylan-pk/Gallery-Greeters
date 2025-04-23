@@ -20,6 +20,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 add_executable(nav_to_goal src/nav_to_goal.cpp)
 add_executable(nav_to_goal2 src/nav_to_goal2.cpp)
 add_executable(path_to_goal src/path_to_goal.cpp)
+add_executable(path_to_goal2 src/path_to_goal2.cpp)
 add_executable(path_subscriber src/path_subscriber.cpp)
 
 # Link dependencies
@@ -53,6 +54,16 @@ ament_target_dependencies(path_to_goal
   tf2_ros
   tf2_geometry_msgs
 )
+ament_target_dependencies(path_to_goal2
+  rclcpp
+  rclcpp_action
+  geometry_msgs
+  nav_msgs
+  nav2_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+)
 ament_target_dependencies(path_subscriber
   rclcpp
   nav_msgs
@@ -63,6 +74,7 @@ install(TARGETS
   nav_to_goal
   nav_to_goal2
   path_to_goal
+  path_to_goal2
   path_subscriber
   DESTINATION lib/${PROJECT_NAME}
 )
