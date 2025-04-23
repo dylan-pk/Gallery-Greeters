@@ -118,18 +118,37 @@ private:
         // RCLCPP_INFO(this->get_logger(), "Published initial pose.");
     }
 
-    void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-        {
-            RCLCPP_INFO(this->get_logger(), "Received PoseStamped:");
-            RCLCPP_INFO(this->get_logger(), "Position -> x: %.2f, y: %.2f, z: %.2f",
-                        msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-            RCLCPP_INFO(this->get_logger(), "Orientation -> x: %.2f, y: %.2f, z: %.2f, w: %.2f",
-                        msg->pose.orientation.x, msg->pose.orientation.y,
-                        msg->pose.orientation.z, msg->pose.orientation.w);
-
-            double yaw = tf2::getYaw(msg->pose.orientation);
-            send_goal(msg->pose.position.x, msg->pose.position.y, yaw);
+    void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+        if (goal_active_) {
+            RCLCPP_INFO(this->get_logger(), "Goal already active, ignoring new goal.");
+            return;
         }
+    
+        goal_active_ = true;
+        RCLCPP_INFO(this->get_logger(), "Received goal pose, sending to Nav2.");
+    
+        auto goal_msg = nav2_msgs::action::ComputePathToPose::Goal();
+        goal_msg.goal = *msg;
+        goal_msg.goal.header.stamp = this->now();
+        goal_msg.goal.header.frame_id = "map";
+    
+        auto send_goal_options = rclcpp_action::Client<nav2_msgs::action::ComputePathToPose>::SendGoalOptions();
+        send_goal_options.result_callback = [this](auto result) {
+            if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+                RCLCPP_INFO(this->get_logger(), "Path successfully computed, publishing...");
+                this->computed_path = result.result->path;
+                this->path_publisher_->publish(this->computed_path);
+                RCLCPP_INFO(this->get_logger(), "Shutting down after publishing path.");
+                rclcpp::shutdown();  // 💥 Shutdown right after publishing path
+            } else {
+                RCLCPP_WARN(this->get_logger(), "Failed to compute path.");
+                goal_active_ = false;
+            }
+        };
+    
+        action_client_->async_send_goal(goal_msg, send_goal_options);
+    }
+    
         
 
     void send_goal(float x, float y, float theta) {
