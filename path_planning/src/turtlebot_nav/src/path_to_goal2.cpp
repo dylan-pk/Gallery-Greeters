@@ -39,12 +39,28 @@ public:
 
         initial_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 10);
         path_publisher_ = this->create_publisher<nav_msgs::msg::Path>("computed_path", 10);
-
+    }
+    void start() {
+        // Wait for action server
         while (!action_client_->wait_for_action_server(2s)) {
             RCLCPP_INFO(this->get_logger(), "Waiting for the compute_path_to_pose action server...");
         }
 
-        rclcpp::sleep_for(2s);
+        // Wait for odometry
+        RCLCPP_INFO(this->get_logger(), "Waiting for odometry...");
+        rclcpp::Rate rate(10);
+        for (int i = 0; i < 100; ++i) {
+            {
+                std::lock_guard<std::mutex> lock(odom_mutex_);
+                if (latest_odom_) {
+                    RCLCPP_INFO(this->get_logger(), "Odometry received.");
+                    break;
+                }
+            }
+            rate.sleep();
+        }
+
+        rclcpp::sleep_for(1s);  // Give some buffer time
         publish_initial_pose();
     }
 
@@ -119,10 +135,10 @@ private:
     }
 
     void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-        if (goal_active_) {
-            RCLCPP_INFO(this->get_logger(), "Goal already active, ignoring new goal.");
-            return;
-        }
+        // if (goal_active_) {
+        //     RCLCPP_INFO(this->get_logger(), "Goal already active, ignoring new goal.");
+        //     return;
+        // }
     
         goal_active_ = true;
         RCLCPP_INFO(this->get_logger(), "Received goal pose, sending to Nav2.");
@@ -138,8 +154,8 @@ private:
                 RCLCPP_INFO(this->get_logger(), "Path successfully computed, publishing...");
                 this->computed_path = result.result->path;
                 this->path_publisher_->publish(this->computed_path);
-                RCLCPP_INFO(this->get_logger(), "Shutting down after publishing path.");
-                rclcpp::shutdown();  // 💥 Shutdown right after publishing path
+                RCLCPP_INFO(this->get_logger(), "Published path.");
+                // rclcpp::shutdown();  //  Shutdown right after publishing path
             } else {
                 RCLCPP_WARN(this->get_logger(), "Failed to compute path.");
                 goal_active_ = false;
@@ -211,13 +227,25 @@ private:
     void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(odom_mutex_);
         latest_odom_ = msg;
+        // Optional debug
+        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Received odometry: (%.2f, %.2f)",
+                             msg->pose.pose.position.x, msg->pose.pose.position.y);
     }
 };
 
-int main(int argc, char ** argv) {
+int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<PathToGoalClient>();
-    rclcpp::spin(node);
+
+    // Start spin thread
+    std::thread spin_thread([&]() {
+        rclcpp::spin(node);
+    });
+
+    // Start logic after spin is running
+    node->start();
+
+    spin_thread.join();
     rclcpp::shutdown();
     return 0;
 }

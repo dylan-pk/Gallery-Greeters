@@ -1028,4 +1028,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/path_to_goal.dir/DependInfo.cmake"
   "CMakeFiles/path_to_goal2.dir/DependInfo.cmake"
   "CMakeFiles/path_subscriber.dir/DependInfo.cmake"
+  "CMakeFiles/goal_publisher.dir/DependInfo.cmake"
   )
