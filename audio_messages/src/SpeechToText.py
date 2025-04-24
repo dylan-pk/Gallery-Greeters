@@ -3,21 +3,31 @@ import pyttsx3
 import pyaudio
 from commands import Commands
 # from tableOrganisation import TableDatabase
-import threading
 from PIL import Image
+
+import threading
 from rclpy.node import Node
 import rclpy
+import queue
+from rclpy.executors import MultiThreadedExecutor
+import time
+import tkinter as tk
+
 from geometry_msgs.msg import PoseStamped
 # spoken = False
 
-TESTING_MODE = True
+audio_to_main_queue = queue.Queue()
+main_to_gui_queue = queue.Queue()
+
+TESTING_MODE = False
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
 class SpeechToText(Node):
     numbers_words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 
-    def __init__(self):
+    def __init__(self, audio_queue, gui_queue):
         super().__init__('speech_to_text')
+        self.audio_queue = audio_queue
         # initialising a recnogiser
         self.r = sr.Recognizer()
         # creating pyaudio object so debugging
@@ -25,16 +35,16 @@ class SpeechToText(Node):
         print(self.device.get_default_input_device_info())
         self.deviceNum = self.device.get_default_input_device_info()["index"]
 
+        self.listeningEnabled = True
+        # self.startVoiceRecognition()
+
         self.availabledrinks = Image.open("audio_messages/src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
 
         self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
-        self.comms = Commands(self)
+        self.comms = Commands(self, gui_queue)
         self.numOfTables = self.comms.getNumofTables()
         # imagesThread = threading.Thread(target=self.comms.runGUI, daemon=True)
         # imagesThread.start()
-
-        self.listeningEnabled = True
-        self.startVoiceRecognition()
         
 
     def startVoiceRecognition(self):
@@ -47,7 +57,7 @@ class SpeechToText(Node):
                 if TESTING_MODE == False:
                     recordedText = self.audioRecording(self.deviceNum, "Run", 1)
                     if recordedText != None:
-                        self.processText(recordedText)
+                        audio_to_main_queue.put(recordedText)
                 else:
                     self.processText("",testing=True)
 
@@ -61,6 +71,8 @@ class SpeechToText(Node):
                     case "greeting":
                         self.comms.modeChange(0) # Waiting for how to send data
                     case "drink":
+                        # self.comms.fullScreenImage(self.availabledrinks, 0, True)
+                        
                         self.getDrinkOrder()
                     case "art":
                         self.comms.artWorkInfo() # COMMAND CODE DONE
@@ -69,10 +81,11 @@ class SpeechToText(Node):
                     case "charge":
                         self.comms.modeChange(2) # Face Change / Waiting for how to send data
                     case "table":
-                        table = self.getTable()
-                        self.comms.goToTable(table) # Waiting for how to send data
-                    case "status":
-                        self.comms.tableStatus() # COMMAND CODE DONE
+                        self.tableCommands(words)
+                    #     table = self.getTable()
+                    #     self.comms.goToTable(table) # Waiting for how to send data
+                    # case "status":
+                    #     self.comms.tableStatus() # COMMAND CODE DONE
                     case "waiter":
                         currentPosition = [0,0,0] # Get currentPosition value and pass it in
                         self.comms.callWaiter(currentPosition) # Face Change / Waiting for how to send data
@@ -91,6 +104,7 @@ class SpeechToText(Node):
                     case 1:
                         self.comms.modeChange(0)
                     case 2:
+                        self.comms.pushToQueue(self.availabledrinks, 0, True)
                         self.getDrinkOrder()
                     case 3:
                         self.comms.artWorkInfo()
@@ -117,23 +131,27 @@ class SpeechToText(Node):
         self.listeningEnabled = True
 
     
-    # def tableCommands(self, sentence):
-    #     print("In table commands function")
-    #     if sentence == "table status":
-    #         self.comms.tableStatus()
-    #     elif sentence == "go to table":
-    #         table = self.getTable()
-    #         self.comms.goToTable(table)
+    def tableCommands(self, sentence):
+        print("In table commands function")
+        go_to_table = True
+        for word in sentence:
+            if word == "status":
+                go_to_table = False
+        if go_to_table:
+            table = self.getTable()
+            self.comms.goToTable(table) # Waiting for how to send data
+        else:
+            self.comms.tableStatus()
     
     def getDrinkOrder(self):
         print("Drink Order Command")
         drinks = [["Carlton",0],["Soda", 0],["Champagne", 0]]
         table = 0
         ordering = True
-        self.comms.fullScreenImage(self.availabledrinks, manualReset=True)
+        self.comms
         while True:
+            # self.listeningEnabled = False
             while ordering:
-                self.listeningEnabled = False
                 self.comms.SpeakText("what drink would you like")
                 ogText = self.audioRecording(self.deviceNum, "Drink Order", 1)
                 drinkRegistered = False
@@ -178,12 +196,19 @@ class SpeechToText(Node):
 
             self.comms.SpeakText("would you like another drink?")
             response = self.audioRecording(self.deviceNum,"Drink Order", 3)
-            if response != "yes":
-                break
+            affirmative = False
+            for word in response.split():
+                if word == "yes" or word == "yeh":
+                    affirmative = True
+                    break
+            
+            if affirmative:
+                ordering = True
             else:
-                pass
+                break
+                
         
-        self.comms.resetToDefault()
+        self.comms.queue.put(lambda: self.comms.resetToDefault())
         self.listeningEnabled = True
         self.comms.SpeakText("Drink Order Sent")
         self.comms.sendDrinkOrder(drinks, table)
@@ -280,10 +305,37 @@ class SpeechToText(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = SpeechToText()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    node = SpeechToText(audio_to_main_queue, main_to_gui_queue)
+
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
+
+    node.startVoiceRecognition()
+    # rclpy.spin(node)
+    # node.destroy_node()
+    # rclpy.shutdown()
+    try:
+        while True:
+            executor.spin_once(timeout_sec=0.01)
+
+            node.comms.root.update_idletasks()
+            node.comms.root.update()
+
+            try:
+                text = audio_to_main_queue.get_nowait()
+                node.processText(text)
+            except queue.Empty:
+                pass
+
+            time.sleep(0.01)
+    except tk.TclError:
+        print("Tkinter GUI Closed")
+    finally:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()
+
+
 
 if __name__ == "__main__":
     main()

@@ -10,14 +10,16 @@ from screeninfo import get_monitors
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseStamped
 from builtin_interfaces.msg import Time
+import threading
 
 DURATION = 2000
 WPM = 160
 
 class Commands:
 
-    def __init__(self, node):
+    def __init__(self, node, gui_queue):
         self.node = node # saved for reference
+        self.queue = gui_queue
 
         self.device = pyaudio.PyAudio()
         # initialising a recogniser
@@ -38,11 +40,17 @@ class Commands:
         self.publisher_location = node.goal_pub
 
         # monitor = get_monitors()[1] # this will allow us to put it on the second screen
+        self.display_event = threading.Event()
         monitors = get_monitors()
+        print(monitors)
         if len(monitors) > 1:
-            monitor = monitors[1]
+            maxx = 0
+            for i, mon in enumerate(monitors):
+                if mon.x != 0 and mon.x > maxx:
+                    maxx = mon.x
+                    self.monitor = monitors[i]
         else:
-            monitor = monitors[0]
+            self.monitor = monitors[0]
         self.root = tk.Tk()
 
         ## Data needed to make images halfscreen
@@ -54,9 +62,11 @@ class Commands:
         # self.root.geometry(f"{self.half_width}x{self.half_height}")
         
         # Establishing the root used
-        self.root.geometry(f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}") # attaching the root to the second screen
+        self.root.geometry(f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}") # attaching the root to the second screen
         self.root.attributes('-fullscreen', True)
         self.root.bind("<Escape>", lambda e: self.root.destroy())
+
+        self.root.after(100, self.process_gui_queue)
         
         ## Establishing all the images
         self.loadInfo()
@@ -68,6 +78,40 @@ class Commands:
         # self.runGUI()   
 
 ################################################################### Base Functionality Code #########################################################################
+    def process_gui_queue(self):
+        while not self.queue.empty():
+            try:
+                func = self.queue.get()
+                func()
+            except Exception as e:
+                print(f"GUI Error: {e}")
+        self.root.after(100, self.process_gui_queue)
+    
+    # def displayNowAndContinue(self, image, continue_func=None, manualReset=True):
+    #     self.display_event.clear()
+
+    #     # Put image display function on the queue
+    #     self.queue.put(lambda: self.fullScreenImage(image, manualReset=manualReset))
+
+    #     # Immediately process the GUI queue so the image displays right away
+    #     while not self.queue.empty():
+    #         try:
+    #             func = self.queue.get_nowait()
+    #             func()
+    #         except Exception as e:
+    #             print(f"[displayNowAndContinue] Error: {e}")
+
+    #     # Optionally continue with some function (e.g., speaking)
+    #     if continue_func is not None:
+    #         continue_func()
+
+    def pushToQueue(self, file, duration, manualReset=False):
+        self.display_event.clear()
+        print(f"display event cleared so it's {self.display_event.is_set()}")
+        self.queue.empty()
+        self.queue.put(lambda: self.fullScreenImage(file, duration, manualReset))
+    
+
     def getNumofTables(self):
         return self.tables.getNumofTables()
     
@@ -100,15 +144,35 @@ class Commands:
         self.tables = TableDatabase("audio_messages/src/resources/tableInfo.txt")
 
     def runGUI(self):
-        self.root.mainloop()
+        try:
+            while True:
+                self.root.update_idletasks()
+                self.root.update()
+                time.sleep(0.01)
+        except tk.TclError:
+            print("GUI closed.")
 
-    def fullScreenImage(self, newImage, duration=4000, manualReset = False):
+    def fullScreenImage(self, newImage, duration=4000, manualReset= False):
         # print(duration)
-        tk_image = ImageTk.PhotoImage(newImage)
-        self.label.configure(image=tk_image)
-        self.label.image = tk_image
-        if manualReset == False:
-            self.root.after(duration, self.resetToDefault)
+        def _update_image():
+            try:
+                # Create the PhotoImage on the main thread
+                tk_image = ImageTk.PhotoImage(newImage)
+
+                # Store a reference to prevent garbage collection
+                self.label.image = tk_image
+                self.label.configure(image=tk_image)
+                print(f"display event before {self.display_event.is_set()}")
+                self.display_event.set()
+                print(f"display event after {self.display_event.is_set()}")
+                # Optionally reset image after duration
+                if not manualReset:
+                    self.root.after(duration, self.resetToDefault)
+            except Exception as e:
+                print(f"[fullScreenImage] Error updating image: {e}")
+
+        # Always call GUI logic via the main thread
+        self.queue.put(_update_image)
 
     def resetToDefault(self):
         # print("reseting to default")
@@ -116,18 +180,24 @@ class Commands:
         self.label.image = self.tk_default_image
 
     # Convert Text to Speech
-    def SpeakText(self, command):
+    def SpeakText(self, command, wait_for_image=False):
+        if wait_for_image and self.display_event is not None:
+            self.display_event.wait()
+        else:
+            time.sleep(0.5)
+        print("speaking now")
         self.engine.say(command)
         # The say function does not work without a run and wait command
         self.engine.runAndWait()
+        # self.display_event.clear()
         time.sleep(0.25)
 
 #################################################################### ROS CALLBACKS ################################################################################
     def odom_callback(self, msg):
         position = msg.pose.pose.position
         orientation = msg.pose.pose.orientation
-        print(f"Position: x = {position.x}, y = {position.y}, z = {position.z}")
-        print(f"Orientation: x = {orientation.x}, y = {orientation.y}, z = {orientation.z}, w = {orientation.w}")
+        # print(f"Position: x = {position.x}, y = {position.y}, z = {position.z}")
+        # print(f"Orientation: x = {orientation.x}, y = {orientation.y}, z = {orientation.z}, w = {orientation.w}")
         self.currentPos = [[position.x, position.y, position.z], [orientation.x, orientation.y, orientation.z, orientation.w]]
 ############################################################## SPECIFIC COMMAND FUNCTONS ##########################################################################
     
@@ -143,12 +213,12 @@ class Commands:
 
             case 2: # Go to Charging Port
                 print("Charging Command Recognised")
-                self.fullScreenImage(self.chargeFace,DURATION)
+                self.pushToQueue(self.chargeFace,DURATION)
                 self.SpeakText("returning to charging port")
 
             case 3: # Dance Mode
                 print("dance mode activated")
-                self.fullScreenImage(self.dancingFace,DURATION)
+                self.pushToQueue(self.dancingFace,DURATION)
                 self.SpeakText("Dancey Dancey")
 
     def sendDrinkOrder(self, drinks, table):
@@ -159,32 +229,38 @@ class Commands:
         # Read closest artwork from publisher
         print("Artwork Info Command Registered")
         # print(f"1: {self.artworks[0]}\n2: {self.artworks[1]}\n3: {self.artworks[2]}\n4: {self.artworks[3]}\n5: {self.artworks[4]}")
-        artwork = int(input("Artwork: ")) # This will be changed to recieve the name of the painting from the visual subsystem
+        # response = # Response from the service
+        artwork = int(input("Artwork: ")) # response.message # This will be changed to recieve the name of the painting from the visual subsystem
+        # if response.success == True:
         if artwork == self.artworks[0] or artwork == 1: # The Ugly Duchess
-                self.fullScreenImage(self.artImages[0], (self.speakingTimeEst(self.artInfo[0]) + DURATION))
+                self.pushToQueue(self.artImages[0], (self.speakingTimeEst(self.artInfo[0]) + DURATION))
                 self.SpeakText(self.artInfo[0].lower())
         elif artwork == self.artworks[1] or artwork == 2: # Composition of Red Yellow and Blue
-                self.fullScreenImage(self.artImages[1], (self.speakingTimeEst(self.artInfo[1]) + DURATION))
+                self.pushToQueue(self.artImages[1], (self.speakingTimeEst(self.artInfo[1]) + DURATION))
                 self.SpeakText(self.artInfo[1].lower())
         elif artwork == self.artworks[2] or artwork == 3: # Scene from Moby Dick
-                self.fullScreenImage(self.artImages[2], (self.speakingTimeEst(self.artInfo[2]) + DURATION))
+                self.pushToQueue(self.artImages[2], (self.speakingTimeEst(self.artInfo[2]) + DURATION))
                 self.SpeakText(self.artInfo[2].lower())
         elif artwork == self.artworks[3] or artwork == 4: # Flowers in Four Seasons
-                self.fullScreenImage(self.artImages[3], (self.speakingTimeEst(self.artInfo[3]) + DURATION))
+                self.pushToQueue(self.artImages[3], (self.speakingTimeEst(self.artInfo[3]) + DURATION))
                 self.SpeakText(self.artInfo[3].lower())
         elif artwork == self.artworks[4] or artwork == 5: # The Persistence of Memory
-                self.fullScreenImage(self.artImages[4], (self.speakingTimeEst(self.artInfo[4]) + DURATION))
+                self.pushToQueue(self.artImages[4], (self.speakingTimeEst(self.artInfo[4]) + DURATION))
                 self.SpeakText(self.artInfo[4].lower())
-                
+        # else:
+        #     self.SpeakText("what image would you like to know about")
+
+
+
     def tableStatus(self):
         print("Table Status Command Registered")
-        statusImage = self.tables.generateTableStatusImage(self.half_width, self.half_height)
-        self.fullScreenImage(statusImage, DURATION)
+        statusImage = self.tables.generateTableStatusImage(self.monitor.width, self.monitor.height)
+        self.pushToQueue(statusImage, DURATION)
 
     def callWaiter(self, location):
         table = self.tables.getClosestTable(location)
         print(f"Call Waiter Command Recognised, calling to table {table}")
-        self.fullScreenImage(self.callingFace)
+        self.pushToQueue(self.callingFace, DURATION)
         self.SpeakText("calling a waiter here")
 
     def goToTable(self, table):
@@ -204,8 +280,10 @@ class Commands:
         factNum = random.randint(0,9)
         # Outputting the fact image and audio
         print("Fun Fact " + self.facts[factNum])
-        self.fullScreenImage(self.factImages[factNum],(self.speakingTimeEst(self.facts[factNum]) + DURATION))
-        self.SpeakText(self.facts[factNum])
+        self.pushToQueue(self.factImages[factNum], (self.speakingTimeEst(self.facts[factNum]) + DURATION))
+        # self.fullScreenImage(self.factImages[factNum],(self.speakingTimeEst(self.facts[factNum]) + DURATION))
+
+        self.SpeakText(self.facts[factNum], wait_for_image=True)
         
         
 
