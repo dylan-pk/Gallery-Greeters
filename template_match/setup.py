@@ -10,7 +10,7 @@ setup(
     packages=[package_name],
     data_files=[
         # Required for ROS 2 package discovery via ament_index
-        (f'share/ament_index/resource_index/packages', [f'resource/{package_name}']),
+        #(f'share/ament_index/resource_index/packages', [f'resource/{package_name}']),
         
         # Required to install your package metadata
         (f'share/{package_name}', ['package.xml']),

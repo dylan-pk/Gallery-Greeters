@@ -42,6 +42,10 @@ class TemplateMatchingNode(Node):
             if file.lower().endswith(('.jpg', '.png')):
                 path = os.path.join(directory, file)
                 image = cv.imread(path, cv.IMREAD_COLOR)
+                label = os.path.splitext(file)[0].lower()
+                
+                self.get_logger().info(f"📂 Loading from: {path} → Label: '{label}'")
+                
                 if image is not None:
                     kp, des = self.orb.detectAndCompute(image, None)
                     label = os.path.splitext(file)[0]
