@@ -9,6 +9,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
+find_package(lifecycle_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
@@ -22,6 +24,7 @@ add_executable(nav_to_goal2 src/nav_to_goal2.cpp)
 add_executable(path_to_goal src/path_to_goal.cpp)
 add_executable(path_to_goal2 src/path_to_goal2.cpp)
 add_executable(path_subscriber src/path_subscriber.cpp)
+add_executable(goal_publisher src/goal_publisher.cpp)
 
 # Link dependencies
 ament_target_dependencies(nav_to_goal
@@ -57,6 +60,8 @@ ament_target_dependencies(path_to_goal
 ament_target_dependencies(path_to_goal2
   rclcpp
   rclcpp_action
+  rclcpp_lifecycle
+  lifecycle_msgs
   geometry_msgs
   nav_msgs
   nav2_msgs
@@ -69,6 +74,10 @@ ament_target_dependencies(path_subscriber
   nav_msgs
 )
 
+ament_target_dependencies(goal_publisher 
+rclcpp geometry_msgs
+)
+
 # Install the executable
 install(TARGETS
   nav_to_goal
@@ -76,6 +85,7 @@ install(TARGETS
   path_to_goal
   path_to_goal2
   path_subscriber
+  goal_publisher 
   DESTINATION lib/${PROJECT_NAME}
 )
 

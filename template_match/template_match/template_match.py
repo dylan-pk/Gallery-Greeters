@@ -2,99 +2,133 @@
 
 import rclpy
 from rclpy.node import Node
-from rclpy.service import Service
-from rclpy.callback_groups import ReentrantCallbackGroup
+from sensor_msgs.msg import Image
+from example_interfaces.srv import SetBool
+from cv_bridge import CvBridge
+from ament_index_python.packages import get_package_share_directory
+
 import cv2 as cv
 import numpy as np
 import os
-from ament_index_python.packages import get_package_share_directory
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
-from example_interfaces.srv import SetBool  # Service type: You can change this to any custom service type.
+
 
 class TemplateMatchingNode(Node):
     def __init__(self):
         super().__init__('template_matching_node')
         self.bridge = CvBridge()
-        
-        # Service to start template matching
-        self.srv = self.create_service(SetBool, 'perform_template_matching', self.handle_template_matching)
+        self.callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
 
-        # Load template image
-        package_path = os.path.join(os.path.dirname(__file__), 'resource')
-        template_path = os.path.join(package_path, 'template.jpg')
-        self.template = cv.imread(template_path, cv.IMREAD_COLOR)
+        # Thresholds
+        self.declare_parameter('confidence_threshold', 0.65)
+        self.confidence_threshold = self.get_parameter('confidence_threshold').value
 
-        if self.template is None:
-            self.get_logger().error(f"Could not read {template_path}. Check the file path!")
-            raise FileNotFoundError("Template image not found.")
+        # ORB detector
+        self.orb = cv.ORB_create(nfeatures=1000)
 
-        self.template_h, self.template_w = self.template.shape[:2]
-        self.temp_b, self.temp_g, self.temp_r = cv.split(self.template)
+        # Load templates
+        resource_path = os.path.join(get_package_share_directory('template_match'), 'resource')
+        self.templates = {}
+        self.load_templates(resource_path)
 
-        # Subscribe to camera feed
+        # Image message store
+        self.latest_image_msg = None
+
+        # ROS Interfaces
         self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
+        self.create_service(SetBool, 'perform_template_matching', self.handle_template_matching)
 
-        # A place to store the latest image for template matching
-        self.latest_image = None
+    def load_templates(self, directory):
+        for file in os.listdir(directory):
+            if file.lower().endswith(('.jpg', '.png')):
+                path = os.path.join(directory, file)
+                image = cv.imread(path, cv.IMREAD_COLOR)
+                label = os.path.splitext(file)[0].lower()
+                
+                self.get_logger().info(f"📂 Loading from: {path} → Label: '{label}'")
+                
+                if image is not None:
+                    kp, des = self.orb.detectAndCompute(image, None)
+                    label = os.path.splitext(file)[0]
+                    self.templates[label] = {
+                        'image': image,
+                        'keypoints': kp,
+                        'descriptors': des
+                    }
+                    self.get_logger().info(f"✅ Loaded template '{label}'")
+                else:
+                    self.get_logger().warn(f"⚠️ Failed to load template: {file}")
 
     def image_callback(self, msg):
-        """Callback function that updates the latest camera image."""
-        frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        self.latest_image = frame
+        self.latest_image_msg = msg
+        try:
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            cv.imwrite('/tmp/latest_camera_frame.jpg', frame)
+        except Exception as e:
+            self.get_logger().error(f"Error converting image: {e}")
 
     def handle_template_matching(self, request, response):
-        """Handle the service call to perform template matching."""
-        if self.latest_image is None:
+        if self.latest_image_msg is None:
             response.success = False
-            response.message = "No image available for matching."
+            response.message = "No image received yet."
             return response
 
-        # Perform template matching
-        result_message = self.match_template(self.latest_image)
+        try:
+            frame = self.bridge.imgmsg_to_cv2(self.latest_image_msg, desired_encoding='bgr8')
+        except Exception as e:
+            response.success = False
+            response.message = f"Failed to convert image: {e}"
+            return response
 
-        # Update response based on result
-        if result_message:
+        label, confidence, matches = self.match_templates(frame)
+
+        if label:
             response.success = True
-            response.message = f"Object matched: {result_message}"
+            response.message = f"Matched: {label} (Confidence: {confidence:.2f})"
         else:
             response.success = False
-            response.message = "No match found."
+            response.message = "No matching object found."
 
         return response
 
-    def match_template(self, frame):
-        """Perform template matching and return the name of the matched object."""
-        img_b, img_g, img_r = cv.split(frame)
-        methods = ['TM_CCOEFF_NORMED']  # You can try other methods if needed
+    def match_templates(self, frame):
+        kp2, des2 = self.orb.detectAndCompute(frame, None)
+        bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
 
-        for meth in methods:
-            method = getattr(cv, meth)
-            res_b = cv.matchTemplate(img_b, self.temp_b, method)
-            res_g = cv.matchTemplate(img_g, self.temp_g, method)
-            res_r = cv.matchTemplate(img_r, self.temp_r, method)
+        best_label = None
+        best_confidence = 0.0
+        best_matches = []
 
-            res = (res_b + res_g + res_r) / 3.0
-            min_val, max_val, min_loc, max_loc = cv.minMaxLoc(res)
+        D_max = 75  # distance normalization factor
+        top_n = 20  # number of top matches to consider
 
-            if method in [cv.TM_SQDIFF, cv.TM_SQDIFF_NORMED]:
-                top_left = min_loc
-            else:
-                top_left = max_loc
+        for label, data in self.templates.items():
+            des1 = data['descriptors']
+            if des1 is None or des2 is None:
+                continue
 
-            bottom_right = (top_left[0] + self.template_w, top_left[1] + self.template_h)
+            matches = bf.match(des1, des2)
+            matches = sorted(matches, key=lambda x: x.distance)
 
-            matched_img = frame.copy()
-            cv.rectangle(matched_img, top_left, bottom_right, (0, 255, 0), 2)
+            if len(matches) < top_n:
+                continue
 
-            # Check if match is above a certain threshold, and if so, we have a valid match
-            threshold = 0.8
-            if max_val > threshold:
-                self.get_logger().info(f"Template matched with value: {max_val}")
-                return "Duchess"  # You can return a name or label corresponding to the object
+            avg_dist = np.mean([m.distance for m in matches[:top_n]])
+            confidence = max(0.0, 1.0 - avg_dist / D_max)
+            self.get_logger().info(f"🖼 Template '{label}' → Confidence: {confidence:.2f}")
 
-        # No match found
-        return None
+            # Save debug match image
+            img_matches = cv.drawMatches(data['image'], data['keypoints'], frame, kp2, matches[:top_n], None, flags=2)
+            cv.imwrite(f"/tmp/match_{label}.jpg", img_matches)
+
+            if confidence > best_confidence:
+                best_confidence = confidence
+                best_label = label
+                best_matches = matches[:top_n]
+
+        if best_confidence > self.confidence_threshold:
+            return best_label, best_confidence, best_matches
+        else:
+            return None, 0.0, []
 
 
 def main(args=None):
@@ -103,6 +137,7 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

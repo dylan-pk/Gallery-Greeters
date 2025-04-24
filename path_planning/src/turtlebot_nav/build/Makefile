@@ -262,6 +262,43 @@ path_subscriber/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/path_subscriber.dir/build.make CMakeFiles/path_subscriber.dir/build
 .PHONY : path_subscriber/fast
 
+#=============================================================================
+# Target rules for targets named goal_publisher
+
+# Build rule for target.
+goal_publisher: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 goal_publisher
+.PHONY : goal_publisher
+
+# fast build rule for target.
+goal_publisher/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/goal_publisher.dir/build.make CMakeFiles/goal_publisher.dir/build
+.PHONY : goal_publisher/fast
+
+src/goal_publisher.o: src/goal_publisher.cpp.o
+.PHONY : src/goal_publisher.o
+
+# target to build an object file
+src/goal_publisher.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/goal_publisher.dir/build.make CMakeFiles/goal_publisher.dir/src/goal_publisher.cpp.o
+.PHONY : src/goal_publisher.cpp.o
+
+src/goal_publisher.i: src/goal_publisher.cpp.i
+.PHONY : src/goal_publisher.i
+
+# target to preprocess a source file
+src/goal_publisher.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/goal_publisher.dir/build.make CMakeFiles/goal_publisher.dir/src/goal_publisher.cpp.i
+.PHONY : src/goal_publisher.cpp.i
+
+src/goal_publisher.s: src/goal_publisher.cpp.s
+.PHONY : src/goal_publisher.s
+
+# target to generate assembly for a file
+src/goal_publisher.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/goal_publisher.dir/build.make CMakeFiles/goal_publisher.dir/src/goal_publisher.cpp.s
+.PHONY : src/goal_publisher.cpp.s
+
 src/nav_to_goal.o: src/nav_to_goal.cpp.o
 .PHONY : src/nav_to_goal.o
 
@@ -397,11 +434,15 @@ help:
 	@echo "... test"
 	@echo "... turtlebot_nav_uninstall"
 	@echo "... uninstall"
+	@echo "... goal_publisher"
 	@echo "... nav_to_goal"
 	@echo "... nav_to_goal2"
 	@echo "... path_subscriber"
 	@echo "... path_to_goal"
 	@echo "... path_to_goal2"
+	@echo "... src/goal_publisher.o"
+	@echo "... src/goal_publisher.i"
+	@echo "... src/goal_publisher.s"
 	@echo "... src/nav_to_goal.o"
 	@echo "... src/nav_to_goal.i"
 	@echo "... src/nav_to_goal.s"

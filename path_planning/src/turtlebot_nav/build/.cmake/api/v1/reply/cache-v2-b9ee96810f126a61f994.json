@@ -2482,6 +2482,18 @@
 			"value" : "/opt/ros/humble/share/libyaml_vendor/cmake"
 		},
 		{
+			"name" : "lifecycle_msgs_DIR",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "The directory containing a CMake configuration file for lifecycle_msgs."
+				}
+			],
+			"type" : "PATH",
+			"value" : "/opt/ros/humble/share/lifecycle_msgs/cmake"
+		},
+		{
 			"name" : "message_filters_DIR",
 			"properties" : 
 			[
@@ -2634,6 +2646,18 @@
 			"value" : "/opt/ros/humble/share/rcl_interfaces/cmake"
 		},
 		{
+			"name" : "rcl_lifecycle_DIR",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "The directory containing a CMake configuration file for rcl_lifecycle."
+				}
+			],
+			"type" : "PATH",
+			"value" : "/opt/ros/humble/share/rcl_lifecycle/cmake"
+		},
+		{
 			"name" : "rcl_logging_interface_DIR",
 			"properties" : 
 			[
@@ -2704,6 +2728,18 @@
 			],
 			"type" : "PATH",
 			"value" : "/opt/ros/humble/share/rclcpp_components/cmake"
+		},
+		{
+			"name" : "rclcpp_lifecycle_DIR",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "The directory containing a CMake configuration file for rclcpp_lifecycle."
+				}
+			],
+			"type" : "PATH",
+			"value" : "/opt/ros/humble/share/rclcpp_lifecycle/cmake"
 		},
 		{
 			"name" : "rcpputils_DIR",
