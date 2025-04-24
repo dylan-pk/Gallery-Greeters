@@ -35,7 +35,9 @@ class SpeechToText(Node):
         print(self.device.get_default_input_device_info())
         self.deviceNum = self.device.get_default_input_device_info()["index"]
 
-        self.listeningEnabled = True
+        self.listening_event = threading.Event()
+        self.listening_event.set()
+        # self.listeningEnabled = True
         # self.startVoiceRecognition()
 
         self.availabledrinks = Image.open("audio_messages/src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
@@ -53,18 +55,20 @@ class SpeechToText(Node):
     
     def commandAudioRecordingLoop(self):
         while True:
-            if self.listeningEnabled: # using a flag so if multi prompt stuff is happening then the command audio loop doesn't get confused
-                if TESTING_MODE == False:
-                    recordedText = self.audioRecording(self.deviceNum, "Run", 1)
-                    if recordedText != None:
-                        # audio_to_main_queue.put(recordedText)
-                        threading.Thread(target=self.processText, args=(recordedText,), daemon=True).start()
-                else:
-                    self.processText("",testing=True)
+            # print(f"loop of audio recording, listening enabled is {self.listeningEnabled}")
+            self.listening_event.wait() # using a threading event so if multi prompt stuff is happening then the command audio loop doesn't get confused
+            if TESTING_MODE == False:
+                recordedText = self.audioRecording(self.deviceNum, "Run", 1)
+                if recordedText != None:
+                    # audio_to_main_queue.put(recordedText)
+                    threading.Thread(target=self.processText, args=(recordedText,), daemon=True).start()
+            else:
+                # self.processText("",testing=True)
+                threading.Thread(target=self.processText, args=("",), kwargs={"testing": True}, daemon=True).start()
 
     def processText(self, text, testing = False):
-        print("processing")
-        self.listeningEnabled = False
+        print(f"processing, listening is disabled")
+        self.listening_event.clear()
         if testing == False:
             words = text.split()
             for word in words:
@@ -130,7 +134,8 @@ class SpeechToText(Node):
                     case _:
                         # print("Not a command word")
                         pass
-        self.listeningEnabled = True
+        self.listening_event.set()
+        print(f"at the end of process text listening is enabled")
 
     
     def tableCommands(self, sentence):
@@ -146,7 +151,7 @@ class SpeechToText(Node):
             self.comms.tableStatus()
     
     def getDrinkOrder(self):
-        print("Drink Order Command")
+        print(f"Drink Order Command")
         drinks = [["Carlton",0],["Soda", 0],["Champagne", 0]]
         table = 0
         ordering = True
@@ -211,9 +216,10 @@ class SpeechToText(Node):
                 
         
         self.comms.queue.put(lambda: self.comms.resetToDefault())
-        self.listeningEnabled = True
+        self.listening_event.set()
         self.comms.SpeakText("Drink Order Sent")
         self.comms.sendDrinkOrder(drinks, table)
+        print(f"at the end of drink order listening is disabled")
     
     def drinksAmount(self):
         # amountregistered = False
@@ -230,7 +236,7 @@ class SpeechToText(Node):
         return number
 
     def getTable(self):
-        self.listeningEnabled = False
+        self.listening_event.clear()
         print("In get Table")
         self.comms.SpeakText("which table should I go to?")
         response = self.audioRecording(self.deviceNum, "GetTable", 1)
@@ -239,7 +245,7 @@ class SpeechToText(Node):
             for word in response_words:
                 if word.isdigit():
                     if int(word) < self.numOfTables:
-                        self.listeningEnabled = True
+                        self.listening_event.set()
                         return int(word)
                 
     def audioRecording(self, device, function, promptNum):
