@@ -110,7 +110,6 @@ class Commands:
         print(f"display event cleared so it's {self.display_event.is_set()}")
         self.queue.empty()
         self.queue.put(lambda: self.fullScreenImage(file, duration, manualReset))
-    
 
     def getNumofTables(self):
         return self.tables.getNumofTables()
@@ -230,7 +229,7 @@ class Commands:
         print("Artwork Info Command Registered")
         # print(f"1: {self.artworks[0]}\n2: {self.artworks[1]}\n3: {self.artworks[2]}\n4: {self.artworks[3]}\n5: {self.artworks[4]}")
         # response = # Response from the service
-        artwork = int(input("Artwork: ")) # response.message # This will be changed to recieve the name of the painting from the visual subsystem
+        artwork = 1# int(input("Artwork: ")) # response.message # This will be changed to recieve the name of the painting from the visual subsystem
         # if response.success == True:
         if artwork == self.artworks[0] or artwork == 1: # The Ugly Duchess
                 self.pushToQueue(self.artImages[0], (self.speakingTimeEst(self.artInfo[0]) + DURATION))

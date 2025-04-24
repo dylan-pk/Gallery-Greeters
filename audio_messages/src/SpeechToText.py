@@ -57,7 +57,8 @@ class SpeechToText(Node):
                 if TESTING_MODE == False:
                     recordedText = self.audioRecording(self.deviceNum, "Run", 1)
                     if recordedText != None:
-                        audio_to_main_queue.put(recordedText)
+                        # audio_to_main_queue.put(recordedText)
+                        threading.Thread(target=self.processText, args=(recordedText,), daemon=True).start()
                 else:
                     self.processText("",testing=True)
 
@@ -72,7 +73,8 @@ class SpeechToText(Node):
                         self.comms.modeChange(0) # Waiting for how to send data
                     case "drink":
                         # self.comms.fullScreenImage(self.availabledrinks, 0, True)
-                        
+                        self.comms.pushToQueue(self.availabledrinks, 0, True)
+                        # threading.Thread(target=self.getDrinkOrder, daemon=True).start()
                         self.getDrinkOrder()
                     case "art":
                         self.comms.artWorkInfo() # COMMAND CODE DONE
