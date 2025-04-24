@@ -65,17 +65,27 @@ private:
     std::atomic<bool> running_;
     bool goal_active_;
     std::mutex goal_mutex_;
+    nav_msgs::msg::Odometry::SharedPtr latest_odom_;
+    std::mutex odom_mutex_;
+    
     // std::condition_variable cv_;
 
     void publish_initial_pose() {
+        std::lock_guard<std::mutex> lock(odom_mutex_);
+        if (!latest_odom_) {
+            RCLCPP_WARN(this->get_logger(), "No odometry data received yet. Skipping initial pose publish.");
+            return;
+        }
+    
         auto msg = geometry_msgs::msg::PoseWithCovarianceStamped();
         msg.header.stamp = this->now();
-        msg.header.frame_id = "map";
-        msg.pose.pose.position.x = -2.0;
-        msg.pose.pose.position.y = -0.5;
-        msg.pose.pose.position.z = 0.0;
-        msg.pose.pose.orientation.z = 0.0;
-        msg.pose.pose.orientation.w = 1.0;
+        msg.header.frame_id = "map";  // Make sure your TF tree supports map->odom transform
+    
+        // Use odometry position
+        msg.pose.pose.position = latest_odom_->pose.pose.position;
+        msg.pose.pose.orientation = latest_odom_->pose.pose.orientation;
+    
+        // Use a reasonable default covariance
         msg.pose.covariance = {
             0.25, 0, 0, 0, 0, 0,
             0, 0.25, 0, 0, 0, 0,
@@ -84,22 +94,61 @@ private:
             0, 0, 0, 0, 0.0685, 0,
             0, 0, 0, 0, 0, 0.0685
         };
+    
         initial_pose_pub_->publish(msg);
-        RCLCPP_INFO(this->get_logger(), "Published initial pose.");
+        RCLCPP_INFO(this->get_logger(), "Published initial pose from odometry.");
+        
+        // auto msg = geometry_msgs::msg::PoseWithCovarianceStamped();
+        // msg.header.stamp = this->now();
+        // msg.header.frame_id = "map";
+        // msg.pose.pose.position.x = -2.0;
+        // msg.pose.pose.position.y = -0.5;
+        // msg.pose.pose.position.z = 0.0;
+        // msg.pose.pose.orientation.z = 0.0;
+        // msg.pose.pose.orientation.w = 1.0;
+        // msg.pose.covariance = {
+        //     0.25, 0, 0, 0, 0, 0,
+        //     0, 0.25, 0, 0, 0, 0,
+        //     0, 0, 0.0, 0, 0, 0,
+        //     0, 0, 0, 0.0685, 0, 0,
+        //     0, 0, 0, 0, 0.0685, 0,
+        //     0, 0, 0, 0, 0, 0.0685
+        // };
+        // initial_pose_pub_->publish(msg);
+        // RCLCPP_INFO(this->get_logger(), "Published initial pose.");
     }
 
-    void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-        {
-            RCLCPP_INFO(this->get_logger(), "Received PoseStamped:");
-            RCLCPP_INFO(this->get_logger(), "Position -> x: %.2f, y: %.2f, z: %.2f",
-                        msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-            RCLCPP_INFO(this->get_logger(), "Orientation -> x: %.2f, y: %.2f, z: %.2f, w: %.2f",
-                        msg->pose.orientation.x, msg->pose.orientation.y,
-                        msg->pose.orientation.z, msg->pose.orientation.w);
-
-            double yaw = tf2::getYaw(msg->pose.orientation);
-            send_goal(msg->pose.position.x, msg->pose.position.y, yaw);
+    void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+        if (goal_active_) {
+            RCLCPP_INFO(this->get_logger(), "Goal already active, ignoring new goal.");
+            return;
         }
+    
+        goal_active_ = true;
+        RCLCPP_INFO(this->get_logger(), "Received goal pose, sending to Nav2.");
+    
+        auto goal_msg = nav2_msgs::action::ComputePathToPose::Goal();
+        goal_msg.goal = *msg;
+        goal_msg.goal.header.stamp = this->now();
+        goal_msg.goal.header.frame_id = "map";
+    
+        auto send_goal_options = rclcpp_action::Client<nav2_msgs::action::ComputePathToPose>::SendGoalOptions();
+        send_goal_options.result_callback = [this](auto result) {
+            if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+                RCLCPP_INFO(this->get_logger(), "Path successfully computed, publishing...");
+                this->computed_path = result.result->path;
+                this->path_publisher_->publish(this->computed_path);
+                RCLCPP_INFO(this->get_logger(), "Shutting down after publishing path.");
+                rclcpp::shutdown();  // 💥 Shutdown right after publishing path
+            } else {
+                RCLCPP_WARN(this->get_logger(), "Failed to compute path.");
+                goal_active_ = false;
+            }
+        };
+    
+        action_client_->async_send_goal(goal_msg, send_goal_options);
+    }
+    
         
 
     void send_goal(float x, float y, float theta) {
@@ -160,7 +209,8 @@ private:
     // }
 
     void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
-        // Not used directly but available for future use
+        std::lock_guard<std::mutex> lock(odom_mutex_);
+        latest_odom_ = msg;
     }
 };
 

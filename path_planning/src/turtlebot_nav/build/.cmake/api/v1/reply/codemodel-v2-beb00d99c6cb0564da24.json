@@ -1,0 +1,115 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-d70136bedc837c971d51.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "turtlebot_nav",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "nav_to_goal::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nav_to_goal-Debug-ea60b268bd22b46313fb.json",
+					"name" : "nav_to_goal",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nav_to_goal2::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nav_to_goal2-Debug-b2f96aa5117ed6e6684c.json",
+					"name" : "nav_to_goal2",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "path_subscriber::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-path_subscriber-Debug-4b037b4a5f24f34abfe0.json",
+					"name" : "path_subscriber",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "path_to_goal::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-path_to_goal-Debug-f085fecda866a01d17e6.json",
+					"name" : "path_to_goal",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "path_to_goal2::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-path_to_goal2-Debug-27ecde77f1698b5eee44.json",
+					"name" : "path_to_goal2",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "turtlebot_nav_uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-turtlebot_nav_uninstall-Debug-ca70b9f65b9dce2587b9.json",
+					"name" : "turtlebot_nav_uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-uninstall-Debug-f70503e59695d9e817b5.json",
+					"name" : "uninstall",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build",
+		"source" : "/home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

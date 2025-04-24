@@ -9,6 +9,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
+find_package(lifecycle_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
@@ -57,6 +59,8 @@ ament_target_dependencies(path_to_goal
 ament_target_dependencies(path_to_goal2
   rclcpp
   rclcpp_action
+  rclcpp_lifecycle
+  lifecycle_msgs
   geometry_msgs
   nav_msgs
   nav2_msgs
