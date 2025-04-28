@@ -20,6 +20,8 @@ public:
     ObstacleAvoidance();
 
     virtual bool isGoalObstructed(const nav_msgs::msg::Odometry &odom, const geometry_msgs::msg::Point &goal);
+
+    bool isGoalInsideObstacle(const nav_msgs::msg::Odometry &odom, const geometry_msgs::msg::Point &goal);
     
     virtual geometry_msgs::msg::Twist adjustVelocity(const geometry_msgs::msg::Twist &original_cmd);
     

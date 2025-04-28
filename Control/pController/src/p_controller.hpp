@@ -11,6 +11,10 @@
 #include <cmath>
 #include <algorithm>
 #include "obstacle_avoidance.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
+#include <chrono>
+#include <thread>
+
 
 /**
  * @class P Controller
@@ -38,6 +42,11 @@ class pController : public rclcpp::Node
 
     void move();
 
+    visualization_msgs::msg::Marker produceMarkerTable(geometry_msgs::msg::Point pt);
+    void publishFinalGoalMarkers();
+    geometry_msgs::msg::Point createPoint(double x, double y, double z);
+    unsigned int ct_; 
+
     // double getDistanceError();
 
     // double getAngularError();
@@ -60,9 +69,13 @@ class pController : public rclcpp::Node
     nav_msgs::msg::Path path_;
     size_t path_index_ = 0;
 
+    int goals_in_obstacles_ = 0;
     rclcpp::TimerBase::SharedPtr timer_;
 
     ObstacleAvoidance& obstacleavoidance_;
-};
+
+    visualization_msgs::msg::MarkerArray markerArray_;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_table_marker;
+};  
 
 #endif // PCONTROLLER_HPP
