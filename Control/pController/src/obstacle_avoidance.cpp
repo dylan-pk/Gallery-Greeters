@@ -37,11 +37,85 @@ std::vector<geometry_msgs::msg::Point> ObstacleAvoidance::getLaserPoints() const
     return points;
 }
 
+// bool ObstacleAvoidance::isGoalObstructed(const nav_msgs::msg::Odometry &odom, const geometry_msgs::msg::Point &goal)
+// {
+//     std::vector<geometry_msgs::msg::Point> points = getLaserPoints();
+
+//     // Get robot's orientation
+//     tf2::Quaternion q(
+//         odom.pose.pose.orientation.x,
+//         odom.pose.pose.orientation.y,
+//         odom.pose.pose.orientation.z,
+//         odom.pose.pose.orientation.w);
+//     tf2::Matrix3x3 m(q);
+//     double roll, pitch, yaw;
+//     m.getRPY(roll, pitch, yaw);  // yaw = robot’s heading
+
+//     const double FRONT_ANGLE_CONE = M_PI; // 90 degrees total (±45°)
+//     const double COLLISION_DISTANCE = 0.35;    // danger zone
+
+//     for (const auto &point : points)
+//     {
+//         double dx = point.x - odom.pose.pose.position.x;
+//         double dy = point.y - odom.pose.pose.position.y;
+//         double distance = std::hypot(dx, dy);
+
+//         if (distance > COLLISION_DISTANCE)
+//             continue;
+
+//         double angle_to_point = std::atan2(dy, dx);
+//         double angle_diff = angle_to_point - yaw;
+
+//         // Normalize to [-π, π]
+//         while (angle_diff > M_PI) angle_diff -= 2 * M_PI;
+//         while (angle_diff < -M_PI) angle_diff += 2 * M_PI;
+
+//         // Check if within frontal cone
+//         if (std::fabs(angle_diff) < FRONT_ANGLE_CONE / 2)
+//         {
+//             RCLCPP_WARN(rclcpp::get_logger("ObstacleAvoidance"), 
+//                         "collision avoidance kicking in, Angle: %.1f°, Distance: %.2f m",
+//                         angle_diff * 180.0 / M_PI, distance);
+//             return true;
+//         }
+//     }
+
+//     return false;
+// }
+
+
+// bool ObstacleAvoidance::isGoalObstructed(const nav_msgs::msg::Odometry &odom, const geometry_msgs::msg::Point &goal)
+// {
+//     std::vector<geometry_msgs::msg::Point> points = getLaserPoints();
+
+//     const double COLLISION_DISTANCE = 0.325;    // danger zone
+
+//     for (const auto &point : points)
+//     {
+//         double dx = point.x - odom.pose.pose.position.x;
+//         double dy = point.y - odom.pose.pose.position.y;
+//         double distance = std::hypot(dx, dy);
+
+//         if (distance < COLLISION_DISTANCE){
+//             RCLCPP_WARN(rclcpp::get_logger("ObstacleAvoidance"), "collision avoidance kicking in");
+//             return true;
+//         }
+//     }
+
+//     return false;
+// }
+
 bool ObstacleAvoidance::isGoalObstructed(const nav_msgs::msg::Odometry &odom, const geometry_msgs::msg::Point &goal)
 {
     std::vector<geometry_msgs::msg::Point> points = getLaserPoints();
 
-    // Get robot's orientation
+    const double FRONT_COLLISION_DISTANCE = 0.5;
+    const double SIDE_COLLISION_DISTANCE = 0.1;
+    const double FRONT_ANGLE_THRESHOLD = M_PI / 6;  // ±45 degrees
+
+    geometry_msgs::msg::Point robot_pos = odom.pose.pose.position;
+
+    // Extract robot yaw from orientation quaternion
     tf2::Quaternion q(
         odom.pose.pose.orientation.x,
         odom.pose.pose.orientation.y,
@@ -49,39 +123,40 @@ bool ObstacleAvoidance::isGoalObstructed(const nav_msgs::msg::Odometry &odom, co
         odom.pose.pose.orientation.w);
     tf2::Matrix3x3 m(q);
     double roll, pitch, yaw;
-    m.getRPY(roll, pitch, yaw);  // yaw = robot’s heading
-
-    const double FRONT_ANGLE_CONE = M_PI; // 90 degrees total (±45°)
-    const double COLLISION_DISTANCE = 0.2;    // danger zone
+    m.getRPY(roll, pitch, yaw);
 
     for (const auto &point : points)
     {
-        double dx = point.x - odom.pose.pose.position.x;
-        double dy = point.y - odom.pose.pose.position.y;
+        double dx = point.x - robot_pos.x;
+        double dy = point.y - robot_pos.y;
         double distance = std::hypot(dx, dy);
-
-        if (distance > COLLISION_DISTANCE)
-            continue;
-
         double angle_to_point = std::atan2(dy, dx);
-        double angle_diff = angle_to_point - yaw;
+        double relative_angle = shortestAngularDistance(yaw, angle_to_point);
 
-        // Normalize to [-π, π]
-        while (angle_diff > M_PI) angle_diff -= 2 * M_PI;
-        while (angle_diff < -M_PI) angle_diff += 2 * M_PI;
+        double threshold = std::abs(relative_angle) < FRONT_ANGLE_THRESHOLD
+                           ? FRONT_COLLISION_DISTANCE
+                           : SIDE_COLLISION_DISTANCE;
 
-        // Check if within frontal cone
-        if (std::fabs(angle_diff) < FRONT_ANGLE_CONE / 2)
-        {
-            RCLCPP_WARN(rclcpp::get_logger("ObstacleAvoidance"), 
-                        "collision avoidance kicking in, Angle: %.1f°, Distance: %.2f m",
-                        angle_diff * 180.0 / M_PI, distance);
+        if (distance < threshold) {
+            RCLCPP_WARN(rclcpp::get_logger("ObstacleAvoidance"),
+                        "⚠️ Obstacle at angle %.2f, distance %.2f", relative_angle, distance);
             return true;
         }
     }
 
     return false;
 }
+
+
+
+double ObstacleAvoidance::shortestAngularDistance(double from, double to)
+{
+    double result = to - from;
+    while (result > M_PI) result -= 2.0 * M_PI;
+    while (result < -M_PI) result += 2.0 * M_PI;
+    return result;
+}
+
 
 
 bool ObstacleAvoidance::isGoalInsideObstacle(const nav_msgs::msg::Odometry &odom, const geometry_msgs::msg::Point &goal) 
@@ -305,60 +380,305 @@ geometry_msgs::msg::Twist ObstacleAvoidance::adjustVelocity(const geometry_msgs:
 //     return new_goal;
 // }
 
+// geometry_msgs::msg::PoseStamped ObstacleAvoidance::suggestNewGoal(
+//     const geometry_msgs::msg::PoseStamped &original_goal,
+//     const geometry_msgs::msg::PoseStamped &next_goal,
+//     double attraction,
+//     double repulsion,
+//     double goal_step)
+// {
+//     geometry_msgs::msg::Point robot_pos = odo_.pose.pose.position;
+//     std::vector<geometry_msgs::msg::Point> obstacles = getLaserPoints();
+
+//     const double Q_attraction = attraction;//100;
+//     const double Q_repulsion = repulsion;//15;
+//     const double MIN_DISTANCE = 0.1;
+//     const double MAX_DISTANCE = 2.0;
+//     const double GOAL_STEP = goal_step;//0.5;
+
+//     // --- Attraction Vector ---
+//     double dx = original_goal.pose.position.x - robot_pos.x;
+//     double dy = original_goal.pose.position.y - robot_pos.y;
+//     double dist = std::hypot(dx, dy);
+
+//     // const double MIN_DIST = 0.05;
+//     // if (dist < MIN_DIST) dist = MIN_DIST;
+
+//     double fx_att = 0.0;
+//     double fy_att = 0.0;
+//     if (dist > 1e-3) {
+//         double F_att = Q_attraction / (4 * M_PI * dist * dist);
+//         fx_att = F_att * dx / dist;
+//         fy_att = F_att * dy / dist;
+//     }
+
+//     // --- Repulsion Vector ---
+//     double fx_rep = 0.0;
+//     double fy_rep = 0.0;
+//     for (const auto &obs : obstacles) {
+//         double dx_o = robot_pos.x - obs.x;
+//         double dy_o = robot_pos.y - obs.y;
+//         double d_o = std::hypot(dx_o, dy_o);
+//         // if (d_o < MIN_DISTANCE || d_o > MAX_DISTANCE) continue;
+//         if (d_o > MAX_DISTANCE) continue;
+
+//         // const double MIN_DIST = 0.05;
+//         // if (d_o < MIN_DIST) d_o = MIN_DIST;
+
+//         double F_rep = Q_repulsion / (4 * M_PI * d_o * d_o);
+//         fx_rep += -F_rep * dx_o / d_o;
+//         fy_rep += -F_rep * dy_o / d_o;
+//     }
+
+//     // --- Final vector ---
+//     double fx = fx_att + fx_rep;
+//     double fy = fy_att + fy_rep;
+//     double norm = std::hypot(fx, fy);
+
+//     geometry_msgs::msg::PoseStamped suggested;
+//     suggested.header = original_goal.header;
+//     suggested.pose.position.x = robot_pos.x + (norm > 1e-5 ? GOAL_STEP * fx / norm : 0.0);
+//     suggested.pose.position.y = robot_pos.y + (norm > 1e-5 ? GOAL_STEP * fy / norm : 0.0);
+//     suggested.pose.position.z = 0.0;
+//     suggested.pose.orientation.w = 1.0;
+
+//     RCLCPP_WARN(rclcpp::get_logger("ObstacleAvoidance"), "Suggesting new goal");
+
+//     return suggested;
+// }
+
+
+
+/////////////////////////////////////////////
+
 geometry_msgs::msg::PoseStamped ObstacleAvoidance::suggestNewGoal(
     const geometry_msgs::msg::PoseStamped &original_goal,
-    const geometry_msgs::msg::PoseStamped &next_goal)
+    const geometry_msgs::msg::PoseStamped &next_goal,
+    double attraction,
+    double repulsion,
+    double goal_step)
 {
     geometry_msgs::msg::Point robot_pos = odo_.pose.pose.position;
     std::vector<geometry_msgs::msg::Point> obstacles = getLaserPoints();
 
-    const double Q_attraction = 100;
-    const double Q_repulsion = 15;
-    const double MIN_DISTANCE = 0.1;
-    const double MAX_DISTANCE = 100.0;
-    const double GOAL_STEP = 0.5;
+    const double Q_attraction = attraction;
+    const double Q_repulsion = repulsion;
+    const double GOAL_STEP = goal_step;
+    const double OBSTACLE_THRESHOLD = 0.3;  // for raycast
+    const double ANGLE_ALIGNMENT_THRESHOLD = M_PI / 10.0;  // 18 degrees
 
-    // --- Attraction Vector ---
+    // --- 1. Compute Attractive Force ---
     double dx = original_goal.pose.position.x - robot_pos.x;
     double dy = original_goal.pose.position.y - robot_pos.y;
     double dist = std::hypot(dx, dy);
 
-    double fx_att = 0.0;
-    double fy_att = 0.0;
-    if (dist > 1e-3) {
-        double F_att = Q_attraction / (4 * M_PI * dist * dist);
-        fx_att = F_att * dx / dist;
-        fy_att = F_att * dy / dist;
-    }
+    double fx_att = Q_attraction * dx;
+    double fy_att = Q_attraction * dy;
 
-    // --- Repulsion Vector ---
+    // --- 2. Compute Repulsive Forces ---
     double fx_rep = 0.0;
     double fy_rep = 0.0;
-    for (const auto &obs : obstacles) {
-        double dx_o = robot_pos.x - obs.x;
-        double dy_o = robot_pos.y - obs.y;
-        double d_o = std::hypot(dx_o, dy_o);
-        if (d_o < MIN_DISTANCE || d_o > MAX_DISTANCE) continue;
 
-        double F_rep = Q_repulsion / (4 * M_PI * d_o * d_o);
-        fx_rep += -F_rep * dx_o / d_o;
-        fy_rep += -F_rep * dy_o / d_o;
+    for (const auto &obs : obstacles)
+    {
+        double ox = obs.x - robot_pos.x;
+        double oy = obs.y - robot_pos.y;
+        double d = std::hypot(ox, oy);
+        if (d < 1e-2 || d > 1.0) continue;
+
+        double rep_factor = Q_repulsion * (1.0 / d - 1.0) / (d * d);
+        fx_rep -= rep_factor * (ox / d);
+        fy_rep -= rep_factor * (oy / d);
     }
 
-    // --- Final vector ---
+    // --- 3. Combine Forces ---
     double fx = fx_att + fx_rep;
     double fy = fy_att + fy_rep;
-    double norm = std::hypot(fx, fy);
 
-    geometry_msgs::msg::PoseStamped suggested;
-    suggested.header = original_goal.header;
-    suggested.pose.position.x = robot_pos.x + (norm > 1e-5 ? GOAL_STEP * fx / norm : 0.0);
-    suggested.pose.position.y = robot_pos.y + (norm > 1e-5 ? GOAL_STEP * fy / norm : 0.0);
-    suggested.pose.position.z = 0.0;
-    suggested.pose.orientation.w = 1.0;
+    // --- 4. Check alignment and path to goal ---
+    bool path_blocked = isPathToGoalObstructed(robot_pos, original_goal.pose.position);
+    double mag_att = std::hypot(fx_att, fy_att);
+    double mag_rep = std::hypot(fx_rep, fy_rep);
+    double dot = fx_att * fx_rep + fy_att * fy_rep;
+    double angle = std::acos(dot / (mag_att * mag_rep + 1e-5));
 
-    return suggested;
+    bool poorly_aligned = (angle < ANGLE_ALIGNMENT_THRESHOLD);
+    bool weak_force = std::hypot(fx, fy) < 1e-3;
+
+    // --- 5. If bad suggestion, do side-step escape ---
+    if (path_blocked || poorly_aligned || weak_force)
+    {
+        RCLCPP_WARN(rclcpp::get_logger("obstacle_avoidance"), "⚠️ Path blocked or attraction poorly aligned. Side-stepping...");
+
+        double side_fx = -dy;  // Perpendicular to attraction
+        double side_fy = dx;
+        double norm = std::hypot(side_fx, side_fy);
+        side_fx /= norm;
+        side_fy /= norm;
+
+        geometry_msgs::msg::PoseStamped sidestep_goal = original_goal;
+        sidestep_goal.pose.position.x = robot_pos.x + side_fx * GOAL_STEP;
+        sidestep_goal.pose.position.y = robot_pos.y + side_fy * GOAL_STEP;
+        return sidestep_goal;
+    }
+
+    // --- 6. Return new suggested goal ---
+    geometry_msgs::msg::PoseStamped new_goal = original_goal;
+    new_goal.pose.position.x = robot_pos.x + fx / std::hypot(fx, fy) * GOAL_STEP;
+    new_goal.pose.position.y = robot_pos.y + fy / std::hypot(fx, fy) * GOAL_STEP;
+    return new_goal;
 }
+
+bool ObstacleAvoidance::isPathToGoalObstructed(const geometry_msgs::msg::Point& start,
+                                               const geometry_msgs::msg::Point& goal) const
+{
+    std::vector<geometry_msgs::msg::Point> laser_points = getLaserPoints();
+    const double STEP = 0.05;
+    const double OBSTACLE_THRESHOLD = 0.25;
+
+    double dx = goal.x - start.x;
+    double dy = goal.y - start.y;
+    double dist = std::hypot(dx, dy);
+    int steps = std::max(1, static_cast<int>(dist / STEP));
+
+    for (int i = 1; i <= steps; ++i)
+    {
+        double ratio = static_cast<double>(i) / steps;
+        double x = start.x + dx * ratio;
+        double y = start.y + dy * ratio;
+
+        for (const auto& obs : laser_points)
+        {
+            if (std::hypot(obs.x - x, obs.y - y) < OBSTACLE_THRESHOLD)
+                return true;
+        }
+    }
+    return false;
+}
+
+
+
+
+geometry_msgs::msg::Point ObstacleAvoidance::getFurthestFrontLaserPoint(
+    const geometry_msgs::msg::Point &robot_pos,
+    const std::vector<geometry_msgs::msg::Point> &laser_points)
+{
+    double max_dist = -1.0;
+    geometry_msgs::msg::Point best_point = robot_pos;  // fallback
+
+    for (const auto &pt : laser_points) {
+        double dx = pt.x - robot_pos.x;
+        double dy = pt.y - robot_pos.y;
+        double angle = std::atan2(dy, dx);
+        double dist = std::hypot(dx, dy);
+
+        if (std::abs(angle) <= M_PI / 2.0 && dist > max_dist) {  // within ±90°
+            max_dist = dist;
+            best_point = pt;
+        }
+    }
+    return best_point;
+}
+
+
+
+
+
+
+
+
+
+//////////////////////////////////////////////////
+
+////with extra repulsion
+// geometry_msgs::msg::PoseStamped ObstacleAvoidance::suggestNewGoal(
+//     const geometry_msgs::msg::PoseStamped &original_goal,
+//     const geometry_msgs::msg::PoseStamped &next_goal,
+//     double attraction,
+//     double repulsion,
+//     double goal_step)
+// {
+//     geometry_msgs::msg::Point robot_pos = odo_.pose.pose.position;
+//     std::vector<geometry_msgs::msg::Point> obstacles = getLaserPoints();
+
+//     const double Q_attraction = attraction;
+//     const double Q_repulsion = repulsion;
+//     const double GOAL_STEP = goal_step;
+
+//     const double INFLUENCE_RADIUS = 0.325;  // distance within which obstacles repel
+//     const double SAFE_DISTANCE = 0.35;     // min allowed distance from obstacles
+//     const double ADJUST_STEP = 0.05;      // how much to nudge goal per adjustment
+//     const int MAX_ITERATIONS = 20;        // avoid infinite loops
+
+//     // --- Attraction Vector (towards original goal) ---
+//     double dx = original_goal.pose.position.x - robot_pos.x;
+//     double dy = original_goal.pose.position.y - robot_pos.y;
+//     double dist = std::hypot(dx, dy);
+
+//     double fx_att = 0.0, fy_att = 0.0;
+//     if (dist > 1e-3) {
+//         double F_att = Q_attraction / (4 * M_PI * dist * dist);
+//         fx_att = F_att * dx / dist;
+//         fy_att = F_att * dy / dist;
+//     }
+
+//     // --- Repulsion Vector (away from nearby obstacles) ---
+//     double fx_rep = 0.0, fy_rep = 0.0;
+//     for (const auto &obs : obstacles) {
+//         double dx_o = robot_pos.x - obs.x;
+//         double dy_o = robot_pos.y - obs.y;
+//         double d_o = std::hypot(dx_o, dy_o);
+
+//         // if (d_o < INFLUENCE_RADIUS && d_o > 1e-3) {
+//         //     double scale = (1.0 / d_o - 1.0 / INFLUENCE_RADIUS);
+//         //     double F_rep = Q_repulsion * scale / (d_o * d_o);
+//         //     fx_rep += F_rep * dx_o / d_o;
+//         //     fy_rep += F_rep * dy_o / d_o;
+//         // }
+//     }
+
+//     // --- Resultant Force Vector ---
+//     double fx = fx_att + fx_rep;
+//     double fy = fy_att + fy_rep;
+//     double norm = std::hypot(fx, fy);
+
+//     geometry_msgs::msg::PoseStamped suggested;
+//     suggested.header = original_goal.header;
+//     suggested.pose.position.x = robot_pos.x + (norm > 1e-5 ? GOAL_STEP * fx / norm : 0.0);
+//     suggested.pose.position.y = robot_pos.y + (norm > 1e-5 ? GOAL_STEP * fy / norm : 0.0);
+//     suggested.pose.position.z = 0.0;
+//     suggested.pose.orientation.w = 1.0;
+
+//     // --- Safety Check: Move away from obstacles if too close ---
+//     // bool safe = false;
+//     // int count = 0;
+
+//     // while (!safe && count++ < MAX_ITERATIONS) {
+//     //     safe = true;
+//     //     for (const auto &point : obstacles) {
+//     //         double dx = suggested.pose.position.x - point.x;
+//     //         double dy = suggested.pose.position.y - point.y;
+//     //         double dist_to_obs = std::hypot(dx, dy);
+
+//     //         if (dist_to_obs < SAFE_DISTANCE && dist_to_obs > 1e-3) {
+//     //             // Nudge away from obstacle
+//     //             double unit_dx = dx / dist_to_obs;
+//     //             double unit_dy = dy / dist_to_obs;
+//     //             suggested.pose.position.x += ADJUST_STEP * unit_dx;
+//     //             suggested.pose.position.y += ADJUST_STEP * unit_dy;
+//     //             safe = false;
+//     //             break;  // recheck all obstacles after each nudge
+//     //         }
+//     //     }
+//     // }
+
+//     RCLCPP_WARN(rclcpp::get_logger("ObstacleAvoidance"), 
+//                 "Suggesting new goal: (%.2f, %.2f)",
+//                 suggested.pose.position.x, suggested.pose.position.y);
+
+//     return suggested;
+// }
+
 
 
 
@@ -389,3 +709,111 @@ geometry_msgs::msg::Point ObstacleAvoidance::localToGlobal(nav_msgs::msg::Odomet
 
     return pt;
 }
+
+
+
+bool ObstacleAvoidance::isPathObstructed()
+{
+    const double FRONT_ARC = M_PI / 4.0;  // ±60 degrees
+    const double SAFE_DIST = 0.325;
+
+    tf2::Quaternion q(
+        odo_.pose.pose.orientation.x,
+        odo_.pose.pose.orientation.y,
+        odo_.pose.pose.orientation.z,
+        odo_.pose.pose.orientation.w);
+    tf2::Matrix3x3 m(q);
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+
+    geometry_msgs::msg::Point robot_pos = odo_.pose.pose.position;
+
+    for (const auto &point : getLaserPoints())
+    {
+        double dx = point.x - robot_pos.x;
+        double dy = point.y - robot_pos.y;
+        double angle = std::atan2(dy, dx) - yaw;
+        double dist = std::hypot(dx, dy);
+
+        while (angle > M_PI) angle -= 2 * M_PI;
+        while (angle < -M_PI) angle += 2 * M_PI;
+
+        if (std::fabs(angle) < FRONT_ARC && dist < SAFE_DIST)
+        {
+            RCLCPP_WARN(this->get_logger(), "⚠️ Path obstructed: angle %.2f°, distance %.2f m", angle * 180.0 / M_PI, dist);
+            return true;
+        }
+    }
+    return false;
+}
+
+
+geometry_msgs::msg::Twist ObstacleAvoidance::avoidCollision()
+{
+    geometry_msgs::msg::Twist avoidance_cmd;
+    avoidance_cmd.linear.x = 0.0;
+    avoidance_cmd.angular.z = 0.3;
+
+    RCLCPP_WARN(this->get_logger(), "⚠️ Obstacle ahead! Turning to avoid.");
+    return avoidance_cmd;
+}
+
+
+
+// geometry_msgs::msg::PoseStamped ObstacleAvoidance::suggestNewGoalSafe()
+// {
+//     geometry_msgs::msg::Point robot_pos = odo_.pose.pose.position;
+//     geometry_msgs::msg::Point target = getFurthestFrontLaserPoint(robot_pos, getLaserPoints());
+
+//     geometry_msgs::msg::PoseStamped safe_goal;
+//     safe_goal.header.frame_id = "odom";
+//     safe_goal.header.stamp = this->get_clock()->now();
+//     safe_goal.pose.position = target;
+
+//     tf2::Quaternion q;
+//     q.setRPY(0, 0, 0);
+//     safe_goal.pose.orientation = tf2::toMsg(q);
+
+//     return safe_goal;
+// }
+
+geometry_msgs::msg::PoseStamped ObstacleAvoidance::suggestNewGoalSafe()
+{
+    geometry_msgs::msg::Point robot_pos = odo_.pose.pose.position;
+    geometry_msgs::msg::Point target = getFurthestFrontLaserPoint(robot_pos, getLaserPoints());
+
+    // Step 1: compute direction vector
+    double dx = target.x - robot_pos.x;
+    double dy = target.y - robot_pos.y;
+    double dist = std::hypot(dx, dy);
+
+    // Step 2: normalize and apply fixed step
+    const double STEP_SIZE = 0.25;  // limit how far the robot escapes
+
+    geometry_msgs::msg::Point safe_point;
+    if (dist > 1e-3)
+    {
+        safe_point.x = robot_pos.x + STEP_SIZE * dx / dist;
+        safe_point.y = robot_pos.y + STEP_SIZE * dy / dist;
+    }
+    else
+    {
+        safe_point = robot_pos;  // fallback (no clear direction)
+    }
+
+    // Step 3: create PoseStamped goal
+    geometry_msgs::msg::PoseStamped safe_goal;
+    safe_goal.header.frame_id = "odom";
+    safe_goal.header.stamp = this->get_clock()->now();
+    safe_goal.pose.position = safe_point;
+
+    // Face in direction of motion
+    double yaw = std::atan2(dy, dx);
+    tf2::Quaternion q;
+    q.setRPY(0, 0, yaw);
+    safe_goal.pose.orientation = tf2::toMsg(q);
+
+    RCLCPP_INFO(this->get_logger(), "Suggesting minimal escape goal (%.2f, %.2f)", safe_point.x, safe_point.y);
+    return safe_goal;
+}
+

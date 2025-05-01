@@ -119,77 +119,254 @@ pController::pController(ObstacleAvoidance &obstacleavoidance) : Node("p_control
 //     }
 // }
 
+// void pController::move()
+// {
+//     // if (!path_.poses.empty() && path_index_ < path_.poses.size()){
+//     // RCLCPP_INFO(this->get_logger(), "current goal is x: %.2f, y: %.2f", path_.poses.at(path_index_).pose.position.x, path_.poses.at(path_index_).pose.position.y);
+//     // }
+//     if (path_.poses.empty())
+//         return;
+
+//     if (path_index_ >= path_.poses.size())
+//     {
+//         RCLCPP_INFO(this->get_logger(), "All waypoints reached.");
+//         RCLCPP_INFO(this->get_logger(), "goals in obstacles: %d", goals_in_obstacles_);
+//         geometry_msgs::msg::Twist stop_msg;
+//         cmd_vel_pub_->publish(stop_msg);
+//         path_index_ = 0;
+//         path_.poses.clear();
+//         return;
+//     }
+
+//     double dist = getDistanceError(path_.poses.at(path_index_));
+//     double angle = getAngularError(path_.poses.at(path_index_));
+
+//     // RCLCPP_INFO(this->get_logger(), "Goal %zu | Distance: %.2f", path_index_ + 1, dist);
+
+//     if (dist < 0.5)
+//     {
+//         if (obstacleavoidance_.isGoalInsideObstacle(getOdometry(), path_.poses.at(path_index_).pose.position))
+//         {
+//             RCLCPP_WARN(this->get_logger(), "Current goal %zu is inside an obstacle. Replacing...", path_index_ + 1);
+//             goals_in_obstacles_++;
+
+//             geometry_msgs::msg::PoseStamped next_goal;
+//             if (path_index_ + 1 < path_.poses.size())
+//                 next_goal = path_.poses[path_index_ + 1];
+//             else
+//                 next_goal = path_.poses[path_index_];
+
+//             geometry_msgs::msg::PoseStamped suggested = obstacleavoidance_.suggestNewGoal(
+//                 path_.poses[path_index_], next_goal, 100, 15, 0.5, false);
+
+//             // Replace just the current goal
+//             path_.poses[path_index_] = suggested;
+
+//             going_to_safe_goal = true;
+//         }
+//     }
+
+//     if (dist < tolerance)
+//     {
+//         RCLCPP_INFO(this->get_logger(), "Reached goal %zu", path_index_ + 1);
+//         path_index_++;
+//         geometry_msgs::msg::Twist stop_msg;
+//         cmd_vel_pub_->publish(stop_msg);
+//         obstruction_handled = false;
+//         going_to_safe_goal = false;
+//         // RCLCPP_INFO(this->get_logger(), "current goal is x: %.2f, y: %.2f", path_.poses.at(path_index_).pose.position.x, path_.poses.at(path_index_).pose.position.y);
+//         return;
+//     }
+
+//     geometry_msgs::msg::Twist cmd_msg;
+//     cmd_msg.linear.x = Kp_linear * dist;
+//     cmd_msg.angular.z = Kp_angular * angle;
+
+//     if (cmd_msg.linear.x > 0.08)
+//     {
+//         cmd_msg.linear.x = 0.08;
+//     }
+
+//     // if (cmd_msg.angular.z > 0.3)
+//     // {
+//     //     cmd_msg.angular.z = 0.3;
+//     // }
+
+//     // if (cmd_msg.linear.x < 0.05)
+//     // {
+//     //     cmd_msg.linear.x = 0.05;
+//     // }
+
+//     // Smooth velocity command (reduce jerkiness)
+//     static geometry_msgs::msg::Twist prev_cmd;
+//     const double SMOOTHING_ALPHA = 0.7;
+//     cmd_msg.linear.x = SMOOTHING_ALPHA * cmd_msg.linear.x + (1 - SMOOTHING_ALPHA) * prev_cmd.linear.x;
+//     cmd_msg.angular.z = SMOOTHING_ALPHA * cmd_msg.angular.z + (1 - SMOOTHING_ALPHA) * prev_cmd.angular.z;
+//     prev_cmd = cmd_msg;
+
+//     cmd_vel_pub_->publish(cmd_msg);
+
+//     // Re-evaluate if obstacle has appeared in front of the goal
+//     // need to fix this!!!!!!!!!!!!!!!!!!!!!!!!
+//     if (!obstruction_handled && !going_to_safe_goal && obstacleavoidance_.isGoalObstructed(getOdometry(), path_.poses.at(path_index_).pose.position))
+//     {
+//             // RCLCPP_WARN(this->get_logger(), "Current goal %zu is inside an obstacle. Replacing...", path_index_ + 1);
+//             // goals_in_obstacles_++;
+
+//             geometry_msgs::msg::Twist stop_msg;
+//             cmd_vel_pub_->publish(stop_msg);
+
+//             obstruction_handled = true;
+
+//             geometry_msgs::msg::PoseStamped next_goal;
+//             if (path_index_ + 1 < path_.poses.size())
+//                 next_goal = path_.poses[path_index_ + 1];
+//             else
+//                 next_goal = path_.poses[path_index_];
+
+//             geometry_msgs::msg::PoseStamped suggested = obstacleavoidance_.suggestNewGoal(
+//                 path_.poses[path_index_], next_goal, 15, 150, 0.5, false);
+
+//             // Replace just the current goal
+//             // path_.poses[path_index_] = suggested;
+//             path_.poses.insert(path_.poses.begin() + path_index_, suggested);
+//     }
+    
+// //     if (!obstruction_handled && obstacleavoidance_.isGoalObstructed(getOdometry(), path_.poses.at(path_index_).pose.position))
+// //         {
+// //             geometry_msgs::msg::Twist stop_msg;
+// //             cmd_vel_pub_->publish(stop_msg);
+            
+
+// //             geometry_msgs::msg::PoseStamped next_goal;
+
+// //             if (path_index_ + 1 < path_.poses.size())
+// //             {
+// //                 next_goal = path_.poses.at(path_index_ + 1);
+// //             }
+// //             else
+// //             {
+// //                 next_goal = path_.poses.at(path_index_); // fallback to current goal
+// //             }
+
+// //             geometry_msgs::msg::PoseStamped temporary_goal = obstacleavoidance_.suggestNewGoal(
+// //                 path_.poses.at(path_index_),
+// //                 next_goal, 25, 150);
+
+// //             obstruction_handled = true;
+
+// //             double dist_temp = getDistanceError(temporary_goal);
+// //             double angle_temp = getAngularError(temporary_goal);
+
+// //             if (dist_temp < tolerance)
+// //             {
+// //                 geometry_msgs::msg::Twist stop_msg;
+// //                 cmd_vel_pub_->publish(stop_msg);
+// //                 obstruction_handled = false;
+// //             }
+// // // 
+// //             geometry_msgs::msg::Twist cmd_msg_temp;
+// //             cmd_msg_temp.linear.x = Kp_linear * dist_temp;
+// //             cmd_msg_temp.angular.z = Kp_angular * angle_temp;
+// //             cmd_vel_pub_->publish(cmd_msg_temp);
+// //         }
+// }
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 void pController::move()
 {
+    // === 1. Exit if path is empty ===
     if (path_.poses.empty())
         return;
 
+    // === 2. Stop and reset if all waypoints are complete ===
     if (path_index_ >= path_.poses.size())
     {
-        RCLCPP_INFO(this->get_logger(), "All waypoints reached.");
-        RCLCPP_INFO(this->get_logger(), "goals in obstacles: %d", goals_in_obstacles_);
+        RCLCPP_INFO(this->get_logger(), "✅ All waypoints reached.");
+        RCLCPP_INFO(this->get_logger(), "🧱 Goals inside obstacles: %d", goals_in_obstacles_);
+
         geometry_msgs::msg::Twist stop_msg;
         cmd_vel_pub_->publish(stop_msg);
+
         path_index_ = 0;
         path_.poses.clear();
         return;
     }
 
-    double dist = getDistanceError(path_.poses.at(path_index_));
-    double angle = getAngularError(path_.poses.at(path_index_));
-
-    // RCLCPP_INFO(this->get_logger(), "Goal %zu | Distance: %.2f", path_index_ + 1, dist);
-
-    if (dist < 0.5)
+    // === 3. Obstruction check ===
+    if (!obstruction_handled && !going_to_safe_goal &&
+        obstacleavoidance_.isGoalObstructed(getOdometry(), path_.poses.at(path_index_).pose.position))
     {
-        if (obstacleavoidance_.isGoalInsideObstacle(getOdometry(), path_.poses.at(path_index_).pose.position))
-        {
-            RCLCPP_WARN(this->get_logger(), "Current goal %zu is inside an obstacle. Replacing...", path_index_ + 1);
-            goals_in_obstacles_++;
+        RCLCPP_WARN(this->get_logger(), "⚠️ Goal %zu is obstructed. Inserting safe goal...", path_index_ + 1);
 
-            geometry_msgs::msg::PoseStamped next_goal;
-            if (path_index_ + 1 < path_.poses.size())
-                next_goal = path_.poses[path_index_ + 1];
-            else
-                next_goal = path_.poses[path_index_];
+        geometry_msgs::msg::PoseStamped next_goal;
+        if (path_index_ + 1 < path_.poses.size())
+            next_goal = path_.poses[path_index_ + 1];
+        else
+            next_goal = path_.poses[path_index_];
 
-            geometry_msgs::msg::PoseStamped suggested = obstacleavoidance_.suggestNewGoal(
-                path_.poses[path_index_], next_goal);
+        geometry_msgs::msg::PoseStamped suggested = obstacleavoidance_.suggestNewGoal(
+            path_.poses[path_index_], next_goal, 3500, 2000, 0.15);
 
-            // Replace just the current goal
-            path_.poses[path_index_] = suggested;
-        }
+        path_.poses.insert(path_.poses.begin() + path_index_, suggested);
+        going_to_safe_goal = true;
+        obstruction_handled = true;
+        new_goal_targeted_ = true;
+        return;
+    }
+
+    // === 4. Log goal once ===
+    if (new_goal_targeted_)
+    {
+        RCLCPP_INFO(this->get_logger(), "🎯 Moving to goal %zu → x: %.2f, y: %.2f",
+                    path_index_ + 1,
+                    path_.poses.at(path_index_).pose.position.x,
+                    path_.poses.at(path_index_).pose.position.y);
+        new_goal_targeted_ = false;
+    }
+
+
+
+    // === 6. Check if current goal is reached ===
+    double dist = getDistanceError(path_.poses.at(path_index_));
+
+    // === 5. If goal is *inside* obstacle (not just obstructed), remove it ===
+    if (dist < 0.4 && obstacleavoidance_.isGoalInsideObstacle(getOdometry(), path_.poses.at(path_index_).pose.position))
+    {
+        RCLCPP_WARN(this->get_logger(), "🚫 Goal %zu is inside obstacle. Deleting...", path_index_ + 1);
+        goals_in_obstacles_++;
+        path_.poses.erase(path_.poses.begin() + path_index_);
+        return;  // Skip movement for this tick
     }
 
     if (dist < tolerance)
     {
-        RCLCPP_INFO(this->get_logger(), "Reached goal %zu", path_index_ + 1);
+        RCLCPP_INFO(this->get_logger(), "🏁 Reached goal %zu", path_index_ + 1);
         path_index_++;
+
         geometry_msgs::msg::Twist stop_msg;
         cmd_vel_pub_->publish(stop_msg);
+
+        new_goal_targeted_ = true;
+        obstruction_handled = false;
+        going_to_safe_goal = false;
         return;
     }
+
+    // === 7. Movement command ===
+    double angle = getAngularError(path_.poses.at(path_index_));
 
     geometry_msgs::msg::Twist cmd_msg;
     cmd_msg.linear.x = Kp_linear * dist;
     cmd_msg.angular.z = Kp_angular * angle;
 
-    if (cmd_msg.linear.x > 0.08)
-    {
-        cmd_msg.linear.x = 0.08;
-    }
+    // Clamp speeds
+    if (cmd_msg.linear.x > 0.08) cmd_msg.linear.x = 0.08;
 
-    if (cmd_msg.angular.z > 0.3)
-    {
-        cmd_msg.angular.z = 0.3;
-    }
-
-        if (cmd_msg.linear.x < 0.03)
-    {
-        cmd_msg.linear.x = 0.03;
-    }
-
-    // Smooth velocity command (reduce jerkiness)
+    // Smooth motion
     static geometry_msgs::msg::Twist prev_cmd;
     const double SMOOTHING_ALPHA = 0.7;
     cmd_msg.linear.x = SMOOTHING_ALPHA * cmd_msg.linear.x + (1 - SMOOTHING_ALPHA) * prev_cmd.linear.x;
@@ -197,47 +374,197 @@ void pController::move()
     prev_cmd = cmd_msg;
 
     cmd_vel_pub_->publish(cmd_msg);
-
-    // --- Re-evaluate if obstacle has appeared in front of the goal ---
-    if (obstacleavoidance_.isGoalObstructed(getOdometry(), path_.poses.at(path_index_).pose.position))
-    {
-        geometry_msgs::msg::Twist stop_msg;
-        cmd_vel_pub_->publish(stop_msg);
-
-        geometry_msgs::msg::PoseStamped next_goal;
-        if (path_index_ + 1 < path_.poses.size())
-            next_goal = path_.poses.at(path_index_ + 1);
-        else
-            next_goal = path_.poses.at(path_index_);
-
-        geometry_msgs::msg::PoseStamped temporary_goal = obstacleavoidance_.suggestNewGoal(
-            path_.poses.at(path_index_), next_goal);
-
-        double dist_temp = getDistanceError(temporary_goal);
-        double angle_temp = getAngularError(temporary_goal);
-
-        geometry_msgs::msg::Twist cmd_msg_temp;
-        cmd_msg_temp.linear.x = Kp_linear * dist_temp;
-        cmd_msg_temp.angular.z = Kp_angular * angle_temp;
-
-        if (cmd_msg_temp.linear.x > 0.08)
-        {
-            cmd_msg_temp.linear.x = 0.08;
-        }
-
-        if (cmd_msg_temp.angular.z > 0.3)
-        {
-            cmd_msg_temp.angular.z = 0.3;
-        }
-
-        // Smooth temp command
-        cmd_msg_temp.linear.x = SMOOTHING_ALPHA * cmd_msg_temp.linear.x + (1 - SMOOTHING_ALPHA) * prev_cmd.linear.x;
-        cmd_msg_temp.angular.z = SMOOTHING_ALPHA * cmd_msg_temp.angular.z + (1 - SMOOTHING_ALPHA) * prev_cmd.angular.z;
-        prev_cmd = cmd_msg_temp;
-
-        cmd_vel_pub_->publish(cmd_msg_temp);
-    }
 }
+
+
+
+/////////////////////////////////////////////////////////////////////////
+// void pController::move()
+// {
+//     if (path_.poses.empty()) return;
+
+//     if (path_index_ >= path_.poses.size())
+//     {
+//         RCLCPP_INFO(this->get_logger(), "✅ All waypoints reached.");
+//         RCLCPP_INFO(this->get_logger(), "🧱 Goals inside obstacles: %d", goals_in_obstacles_);
+//         geometry_msgs::msg::Twist stop_msg;
+//         cmd_vel_pub_->publish(stop_msg);
+//         path_index_ = 0;
+//         path_.poses.clear();
+//         return;
+//     }
+
+//     const auto &current_goal = path_.poses.at(path_index_);
+//     RCLCPP_INFO(this->get_logger(), "🎯 Current goal [%zu]: x=%.2f, y=%.2f", path_index_ + 1, current_goal.pose.position.x, current_goal.pose.position.y);
+
+// if (escaping_collision_)
+// {
+//     // Keep rotating until clear
+//     if (obstacleavoidance_.isPathObstructed())
+//     {
+//         geometry_msgs::msg::Twist avoid_cmd;
+//         avoid_cmd.linear.x = 0.0;
+//         avoid_cmd.angular.z = 0.3 * escape_direction_;  // Continue turning
+//         cmd_vel_pub_->publish(avoid_cmd);
+//         return;
+//     }
+//     else
+//     {
+//         // Done rotating — generate escape goal
+//             geometry_msgs::msg::PoseStamped next_goal;
+//             if (path_index_ + 1 < path_.poses.size())
+//                 next_goal = path_.poses[path_index_ + 1];
+//             else
+//                 next_goal = path_.poses[path_index_];
+
+//             geometry_msgs::msg::PoseStamped suggested = obstacleavoidance_.suggestNewGoal(
+//                 path_.poses[path_index_], next_goal, 1000, 15, 0.5, false);
+//         path_.poses.insert(path_.poses.begin() + path_index_, suggested);
+//         escaping_collision_ = false;
+//         obstruction_handled = true;  // mark obstruction handled
+//         return;
+//     }
+// }
+
+// // Trigger collision escape
+// if (obstacleavoidance_.isPathObstructed())
+// {
+//     RCLCPP_WARN(this->get_logger(), "⚠️ Collision detected — beginning escape rotation.");
+
+//     double angle_diff = getAngleToGoal(path_.poses[path_index_].pose.position);
+//     escape_direction_ = (angle_diff >= 0) ? +1 : -1;
+//     escaping_collision_ = true;
+//     return;
+// }
+
+
+//     // Check if goal is inside an obstacle (statically unreachable)
+//     if (!going_to_safe_goal && obstacleavoidance_.isGoalInsideObstacle(getOdometry(), current_goal.pose.position))
+//     {
+//         RCLCPP_WARN(this->get_logger(), "🚫 Goal %zu is inside obstacle! Replacing...", path_index_ + 1);
+//         goals_in_obstacles_++;
+
+//         // Replace current goal with a safe one
+//         path_.poses[path_index_] = obstacleavoidance_.suggestNewGoalSafe();
+//         going_to_safe_goal = true;
+//         return;
+//     }
+
+//     double dist = getDistanceError(current_goal);
+//     double angle = getAngularError(current_goal);
+
+//     if (dist < tolerance)
+//     {
+//         RCLCPP_INFO(this->get_logger(), "🏁 Reached goal %zu", path_index_ + 1);
+//         path_index_++;
+//         geometry_msgs::msg::Twist stop_msg;
+//         cmd_vel_pub_->publish(stop_msg);
+//         going_to_safe_goal = false;
+//         obstruction_handled = false;
+//         return;
+//     }
+
+//     // Check for dynamic obstruction appearing mid-path
+//     if (!obstruction_handled && !going_to_safe_goal && obstacleavoidance_.isGoalObstructed(getOdometry(), current_goal.pose.position))
+//     {
+//         RCLCPP_WARN(this->get_logger(), "⚠️ Dynamic obstacle detected! Adjusting goal...");
+
+//         geometry_msgs::msg::PoseStamped next_goal = (path_index_ + 1 < path_.poses.size()) 
+//             ? path_.poses[path_index_ + 1]
+//             : path_.poses[path_index_];
+
+//         geometry_msgs::msg::PoseStamped suggested = obstacleavoidance_.suggestNewGoal(
+//             path_.poses[path_index_], next_goal, 100, 15, 0.1, true);
+
+//         path_.poses.insert(path_.poses.begin() + path_index_, suggested);
+//         obstruction_handled = true;
+//         return;
+//     }
+
+//     // --- Velocity Command ---
+//     geometry_msgs::msg::Twist cmd_msg;
+//     cmd_msg.linear.x = Kp_linear * dist;
+//     cmd_msg.angular.z = Kp_angular * angle;
+
+//     // Manual clamp
+//     if (cmd_msg.linear.x > 0.1) cmd_msg.linear.x = 0.1;
+//     // if (cmd_msg.linear.x < 0.05) cmd_msg.linear.x = 0.05;
+
+//     // if (cmd_msg.angular.z > 0.3) cmd_msg.angular.z = 0.3;
+//     // if (cmd_msg.angular.z < -0.3) cmd_msg.angular.z = -0.3;
+
+//     // Smooth velocity command
+//     static geometry_msgs::msg::Twist prev_cmd;
+//     const double SMOOTHING_ALPHA = 0.7;
+//     cmd_msg.linear.x = SMOOTHING_ALPHA * cmd_msg.linear.x + (1 - SMOOTHING_ALPHA) * prev_cmd.linear.x;
+//     cmd_msg.angular.z = SMOOTHING_ALPHA * cmd_msg.angular.z + (1 - SMOOTHING_ALPHA) * prev_cmd.angular.z;
+//     prev_cmd = cmd_msg;
+
+//     cmd_vel_pub_->publish(cmd_msg);
+// }
+
+
+
+
+double pController::getAngleToGoal(const geometry_msgs::msg::Point &goal)
+{
+    geometry_msgs::msg::Point robot_pos = getOdometry().pose.pose.position;
+    double dx = goal.x - robot_pos.x;
+    double dy = goal.y - robot_pos.y;
+    double goal_angle = std::atan2(dy, dx);
+
+    tf2::Quaternion q(
+        getOdometry().pose.pose.orientation.x,
+        getOdometry().pose.pose.orientation.y,
+        getOdometry().pose.pose.orientation.z,
+        getOdometry().pose.pose.orientation.w);
+    tf2::Matrix3x3 m(q);
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+
+    double angle_diff = goal_angle - yaw;
+    while (angle_diff > M_PI) angle_diff -= 2 * M_PI;
+    while (angle_diff < -M_PI) angle_diff += 2 * M_PI;
+    return angle_diff;
+}
+
+
+
+
+
+
+
+
+// double dist_temp = getDistanceError(temporary_goal);
+// double angle_temp = getAngularError(temporary_goal);
+
+// geometry_msgs::msg::Twist cmd_msg_temp;
+// cmd_msg_temp.linear.x = Kp_linear * dist_temp;
+// cmd_msg_temp.angular.z = Kp_angular * angle_temp;
+
+// if (cmd_msg_temp.linear.x > 0.08)
+// {
+//     cmd_msg_temp.linear.x = 0.08;
+// }
+
+// if (cmd_msg_temp.angular.z > 0.3)
+// {
+//     cmd_msg_temp.angular.z = 0.3;
+// }
+
+// if (cmd_msg_temp.linear.x < 0.03)
+// {
+//     cmd_msg_temp.linear.x = 0.03;
+// }
+
+// // Smooth temp command
+// cmd_msg_temp.linear.x = SMOOTHING_ALPHA * cmd_msg_temp.linear.x + (1 - SMOOTHING_ALPHA) * prev_cmd.linear.x;
+// cmd_msg_temp.angular.z = SMOOTHING_ALPHA * cmd_msg_temp.angular.z + (1 - SMOOTHING_ALPHA) * prev_cmd.angular.z;
+// prev_cmd = cmd_msg_temp;
+
+// cmd_vel_pub_->publish(cmd_msg_temp);
+
+// //andrews diagnosis, goal is not being handled correctly hence not acting like the replacement goal, new suggestion is to add the goal to the vector and update current goal
 
 double pController::getDistanceError(const geometry_msgs::msg::PoseStamped &goal)
 {

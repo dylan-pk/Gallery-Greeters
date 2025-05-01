@@ -13,6 +13,8 @@
 #include <algorithm>
 
 
+
+
 class ObstacleAvoidance: public rclcpp::Node
 {
 public:
@@ -25,9 +27,17 @@ public:
     
     virtual geometry_msgs::msg::Twist adjustVelocity(const geometry_msgs::msg::Twist &original_cmd);
     
-    virtual geometry_msgs::msg::PoseStamped suggestNewGoal(const geometry_msgs::msg::PoseStamped &original_goal, const geometry_msgs::msg::PoseStamped &next_goal);
+    virtual geometry_msgs::msg::PoseStamped suggestNewGoal(const geometry_msgs::msg::PoseStamped &original_goal, const geometry_msgs::msg::PoseStamped &next_goal, double attraction, double repulsion, double goal_step);
+
+    bool isPathObstructed();
+
+    geometry_msgs::msg::Twist avoidCollision();
+
+    geometry_msgs::msg::PoseStamped suggestNewGoalSafe();
 
 private:
+
+    double shortestAngularDistance(double from, double to);
 
     void laserCallback(const std::shared_ptr<sensor_msgs::msg::LaserScan> msg);
 
@@ -38,6 +48,14 @@ private:
     geometry_msgs::msg::Point localToGlobal(nav_msgs::msg::Odometry global, geometry_msgs::msg::Point local) const;
 
     std::vector<geometry_msgs::msg::Point> getLaserPoints() const;
+
+    bool isPathToGoalObstructed(const geometry_msgs::msg::Point& start,
+                                               const geometry_msgs::msg::Point& goal) const;
+    
+    
+    geometry_msgs::msg::Point getFurthestFrontLaserPoint(
+    const geometry_msgs::msg::Point &robot_pos,
+    const std::vector<geometry_msgs::msg::Point> &laser_points);
 
     
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_sub_;

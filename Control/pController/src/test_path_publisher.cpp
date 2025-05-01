@@ -52,6 +52,9 @@ public:
         {2, 1.8, 0.0},
         {2.4, 2.23, 0.0}
 
+        //ros2 topic pub /pose_topic geometry_msgs/msg/PoseStamped '{header: {frame_id: "map"}, pose: {position: {x: 2.4, y: 2.23, z: 0.0}, orientation: {w: 1.0}}}'
+
+
         // tables 1-5
     };
 

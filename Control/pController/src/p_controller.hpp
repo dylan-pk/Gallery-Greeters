@@ -76,6 +76,19 @@ class pController : public rclcpp::Node
 
     visualization_msgs::msg::MarkerArray markerArray_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_table_marker;
+
+    bool obstruction_handled = false;
+    bool going_to_safe_goal = false;
+
+    bool escaping_collision_ = false;
+int escape_direction_ = 0;
+
+double getAngleToGoal(const geometry_msgs::msg::Point &goal);
+
+geometry_msgs::msg::PoseStamped pending_goal_;
+bool new_goal_targeted_ = false;
+
+
 };  
 
 #endif // PCONTROLLER_HPP
