@@ -35,6 +35,19 @@ public:
 
     geometry_msgs::msg::PoseStamped suggestNewGoalSafe();
 
+    bool isPathToGoalObstructed(const geometry_msgs::msg::Point& start,
+                                const geometry_msgs::msg::Point& goal, double front_dist, double side_dist) const;
+
+    bool collisionIminent(const nav_msgs::msg::Odometry &odom);
+
+    bool collisionTooClose(const nav_msgs::msg::Odometry &odom, double clearance);
+
+    bool isGoalReachableDespiteObstruction(
+    const geometry_msgs::msg::PoseStamped &goal,
+    double max_distance,
+    double max_angle_rad,
+    double clearance_radius) const;
+
 private:
 
     double shortestAngularDistance(double from, double to);
@@ -49,8 +62,7 @@ private:
 
     std::vector<geometry_msgs::msg::Point> getLaserPoints() const;
 
-    bool isPathToGoalObstructed(const geometry_msgs::msg::Point& start,
-                                               const geometry_msgs::msg::Point& goal) const;
+
     
     
     geometry_msgs::msg::Point getFurthestFrontLaserPoint(
