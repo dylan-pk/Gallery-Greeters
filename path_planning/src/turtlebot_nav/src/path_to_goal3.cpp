@@ -52,8 +52,8 @@ public:
         odometry_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "odom", 10, std::bind(&PathToGoalClient::odometry_callback, this, _1));
 
-        map_meta_ = load_map_yaml("my_map.yaml");
-        int inflation_radius = 1.5;  // Adjust this value to set the safety margin
+        map_meta_ = load_map_yaml("gallery_map.yaml");
+        int inflation_radius = 0;  // Adjust this value to set the safety margin
         auto [inflated_grid, visualization_grid] = load_map_image(map_meta_.image_path, map_meta_, inflation_radius);
 
         occupancy_grid_ = inflated_grid;  // Use the inflated grid for pathfinding
