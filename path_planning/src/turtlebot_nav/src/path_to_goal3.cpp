@@ -53,7 +53,7 @@ public:
             "odom", 10, std::bind(&PathToGoalClient::odometry_callback, this, _1));
 
         map_meta_ = load_map_yaml("gallery_map.yaml");
-        int inflation_radius = 0;  // Adjust this value to set the safety margin
+        int inflation_radius = 3;  // Adjust this value to set the safety margin
         auto [inflated_grid, visualization_grid] = load_map_image(map_meta_.image_path, map_meta_, inflation_radius);
 
         occupancy_grid_ = inflated_grid;  // Use the inflated grid for pathfinding
@@ -130,7 +130,7 @@ private:
 
     Point world_to_grid(float wx, float wy) {
         int gx = static_cast<int>((wx - map_meta_.origin_x) / map_meta_.resolution);
-        int gy = static_cast<int>((wy - map_meta_.origin_y) / map_meta_.resolution);
+        int gy = static_cast<int>((map_meta_.origin_y + map_meta_.resolution * occupancy_grid_.rows - wy) / map_meta_.resolution);
         return {gx, gy};
     }
 
@@ -220,14 +220,14 @@ private:
 
         // Check if start or goal is in an occupied cell
         RCLCPP_INFO(this->get_logger(), "Start grid value: %d", occupancy_grid_.at<uchar>(start.y, start.x));
-        if (occupancy_grid_.at<uchar>(start.y, start.x) == 255) {
-            RCLCPP_WARN(this->get_logger(), "Start position is in an occupied cell.");
-            return;
-        }
-        if (occupancy_grid_.at<uchar>(goal.y, goal.x) >= 50) {
-            RCLCPP_WARN(this->get_logger(), "Goal position is in an occupied cell.");
-            return;
-        }
+        // if (occupancy_grid_.at<uchar>(start.y, start.x) == 255) {
+        //     RCLCPP_WARN(this->get_logger(), "Start position is in an occupied cell.");
+        //     return;
+        // }
+        // if (occupancy_grid_.at<uchar>(goal.y, goal.x) >= 50) {
+        //     RCLCPP_WARN(this->get_logger(), "Goal position is in an occupied cell.");
+        //     return;
+        // }
 
         // Call A* to find path
         std::vector<Point> path = a_star(start, goal);
