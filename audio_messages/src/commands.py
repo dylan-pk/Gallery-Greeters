@@ -14,6 +14,8 @@ import threading
 
 DURATION = 2000
 WPM = 160
+GREETLOCATION = [1,1]
+CHARGINGLOCATION = [2,2]
 
 class Commands:
 
@@ -28,15 +30,16 @@ class Commands:
         # self.testingVoices()
         self.engine.setProperty('rate',WPM)
         voices = self.engine.getProperty('voices')
-        self.engine.setProperty('voice', voices[19].id) 
+        self.engine.setProperty('voice', voices[19].id)
+        
 
         ## ROS Topics and stuff
         self.subscriber_currentPos = node.create_subscription(Odometry, '/odom', self.odom_callback, 10)
-        # self.service_artIdentification
-        # self.publisher_drinkOrders
-        # self.publisher_movementMode
-        # self.publisher_location
 
+        # self.service_artIdentification
+
+        # self.publisher_drinkOrders
+        self.publisher_movementMode = node.mode_pub
         self.publisher_location = node.goal_pub
 
         # monitor = get_monitors()[1] # this will allow us to put it on the second screen
@@ -141,6 +144,16 @@ class Commands:
         
         # Table Database
         self.tables = TableDatabase("audio_messages/src/resources/tableInfo.txt")
+    
+    def establishLocations(self, location_x, location_y):
+        goal = PoseStamped()
+        goal.header.frame_id = "map"
+        goal.header.stamp = self.node.get_clock().now().to_msg() 
+        goal.pose.position.x = location_x
+        goal.pose.position.y = location_y
+        goal.pose.orientation.w = 1.0
+
+        return goal
 
     def runGUI(self):
         try:
@@ -203,22 +216,28 @@ class Commands:
     def modeChange(self, mode):
         match mode:
             case 0: # Greet Guests
+                self.publisher_movementMode.publish(mode)
                 print("Greeting Guests Command Recognised")
                 self.SpeakText("going to door to greet guests")
+                self.publisher_location.publish(self.establishLocations(GREETLOCATION[0], GREETLOCATION[1]))
 
             case 1: # Wander Around
+                self.publisher_movementMode.publish(mode)
                 print("Wander Command Recognised")
                 self.SpeakText("beginning wander mode")
 
-            case 2: # Go to Charging Port
-                print("Charging Command Recognised")
-                self.pushToQueue(self.chargeFace,DURATION)
-                self.SpeakText("returning to charging port")
-
-            case 3: # Dance Mode
+            case 2: # Dance Mode
+                self.publisher_movementMode.publish(mode)
                 print("dance mode activated")
                 self.pushToQueue(self.dancingFace,DURATION)
                 self.SpeakText("Dancey Dancey")
+            
+            case 3: # Go to Charging Port
+                self.publisher_movementMode.publish(mode)
+                print("Charging Command Recognised")
+                self.pushToQueue(self.chargeFace,DURATION)
+                self.SpeakText("returning to charging port")
+                self.publisher_location.publish(self.establishLocations(CHARGINGLOCATION[0], CHARGINGLOCATION[1]))
 
     def sendDrinkOrder(self, drinks, table):
         for i in range(3):
@@ -272,7 +291,7 @@ class Commands:
         goal.pose.position.x = tableLocation[0]
         goal.pose.position.y = tableLocation[1]
         goal.pose.orientation.w = 1.0
-        self.publisher_location.publish(goal)
+        self.publisher_location.publish(self.establishLocations(tableLocation[0], tableLocation[1]))
 
 
     def funFact(self):

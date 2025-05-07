@@ -2,6 +2,7 @@ import speech_recognition as sr
 import pyttsx3
 import pyaudio
 from commands import Commands
+from std_msgs.msg import Int32
 # from tableOrganisation import TableDatabase
 from PIL import Image
 
@@ -43,6 +44,7 @@ class SpeechToText(Node):
         self.availabledrinks = Image.open("audio_messages/src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
 
         self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
+        self.mode_pub = self.create_publisher(Int32, '/robot_mode', 10)
         self.comms = Commands(self, gui_queue)
         self.numOfTables = self.comms.getNumofTables()
         # imagesThread = threading.Thread(target=self.comms.runGUI, daemon=True)
