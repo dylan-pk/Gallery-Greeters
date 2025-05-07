@@ -137,7 +137,7 @@ private:
     geometry_msgs::msg::PoseStamped grid_to_pose(int gx, int gy) {
         geometry_msgs::msg::PoseStamped pose;
         pose.pose.position.x = gx * map_meta_.resolution + map_meta_.origin_x + map_meta_.resolution / 2.0f;
-        pose.pose.position.y = gy * map_meta_.resolution + map_meta_.origin_y + map_meta_.resolution / 2.0f;
+        pose.pose.position.y = map_meta_.origin_y + map_meta_.resolution * occupancy_grid_.rows - (gy * map_meta_.resolution + map_meta_.resolution / 2.0f);
         pose.pose.orientation.w = 1.0;
         return pose;
     }
