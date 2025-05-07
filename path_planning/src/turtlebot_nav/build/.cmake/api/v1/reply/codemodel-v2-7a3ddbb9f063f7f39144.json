@@ -1,0 +1,133 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-5250f07e9daa5909d12e.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "turtlebot_nav",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "goal_publisher::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-goal_publisher-Debug-8960fb9e68dd860e64d7.json",
+					"name" : "goal_publisher",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nav_to_goal::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nav_to_goal-Debug-d7f61b8b06a1c41fc94b.json",
+					"name" : "nav_to_goal",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nav_to_goal2::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nav_to_goal2-Debug-3597541349feffe4f26c.json",
+					"name" : "nav_to_goal2",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "path_subscriber::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-path_subscriber-Debug-fa2d32c7a2d77b398eb2.json",
+					"name" : "path_subscriber",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "path_to_goal::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-path_to_goal-Debug-ac0bca5fe229a53aa737.json",
+					"name" : "path_to_goal",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "path_to_goal2::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-path_to_goal2-Debug-05ca46ea6ebecc5e5968.json",
+					"name" : "path_to_goal2",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "path_to_goal3::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-path_to_goal3-Debug-6f211857f1241827487d.json",
+					"name" : "path_to_goal3",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "turtlebot_nav_uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-turtlebot_nav_uninstall-Debug-ca70b9f65b9dce2587b9.json",
+					"name" : "turtlebot_nav_uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-uninstall-Debug-f70503e59695d9e817b5.json",
+					"name" : "uninstall",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build",
+		"source" : "/home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

@@ -38,6 +38,7 @@ public:
             "/pose_topic", 10, std::bind(&PathToGoalClient::pose_callback, this, std::placeholders::_1));
 
         initial_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 10);
+
         path_publisher_ = this->create_publisher<nav_msgs::msg::Path>("computed_path", 10);
     }
     void start() {
@@ -89,7 +90,7 @@ private:
     void publish_initial_pose() {
         std::lock_guard<std::mutex> lock(odom_mutex_);
         if (!latest_odom_) {
-            RCLCPP_WARN(this->get_logger(), "No odometry data received yet. Skipping initial pose publish.");
+            RCLCPP_WARN(this->get_logger(), "No odometry data received yet. Cannot publish initial pose.");
             return;
         }
     
