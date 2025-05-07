@@ -6,6 +6,7 @@ from sensor_msgs.msg import Image
 from example_interfaces.srv import SetBool
 from cv_bridge import CvBridge
 from ament_index_python.packages import get_package_share_directory
+from std_msgs.msg import Bool
 
 import cv2 as cv
 import numpy as np
@@ -33,10 +34,16 @@ class TemplateMatchingNode(Node):
         # Image message store
         self.latest_image_msg = None
 
-        # ROS Interfaces
+        # State tracking
+        self.latest_image_msg = None
+
+        # ROS interfaces
         self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
         self.create_service(SetBool, 'perform_template_matching', self.handle_template_matching)
 
+        # Publisher to interrupt signal
+        self.interrupt_pub = self.create_publisher(Bool, '/interrupt_signal', 10)
+    
     def load_templates(self, directory):
         for file in os.listdir(directory):
             if file.lower().endswith(('.jpg', '.png')):
@@ -84,6 +91,12 @@ class TemplateMatchingNode(Node):
         if label:
             response.success = True
             response.message = f"Matched: {label} (Confidence: {confidence:.2f})"
+
+            # Publiush interrupt signal
+            interrupt_msg = Bool()
+            interrupt_msg.data = True
+            self.interrupt_pub.publish(interrupt_msg)
+            self.get_logger().warn(f"📢 Interrupt signal published due to match: {label}")
         else:
             response.success = False
             response.message = "No matching object found."
