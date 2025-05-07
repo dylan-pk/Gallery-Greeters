@@ -48,7 +48,7 @@ void pController::mode_callback(const std_msgs::msg::Int32::SharedPtr msg)
 
         dancing_ = true;
         dance_cycles_ = 0;
-        dance_stage_ = 0;  // 0 = rotate left, 1 = rotate right
+        dance_stage_ = 0; // 0 = rotate left, 1 = rotate right
         yaw_dance_accumulated_ = 0.0;
         first_dance_step_ = true;
 
@@ -86,8 +86,9 @@ void pController::move()
         return;
 
     // === 2. Stop and reset if all waypoints are complete ===
-    if (path_index_ >= path_.poses.size())
+    if (path_index_ >= path_.poses.size() && !sentry_mode_)
     {
+
         RCLCPP_INFO(this->get_logger(), "All waypoints reached.");
         RCLCPP_INFO(this->get_logger(), "Goals inside obstacles: %d", goals_in_obstacles_);
 
@@ -97,6 +98,28 @@ void pController::move()
         path_index_ = 0;
         path_.poses.clear();
         return;
+    }
+
+    if (path_index_ >= path_.poses.size() &&sentry_mode_)
+        {
+            path_index_ = 0;
+        }
+    
+    if (sentry_mode_ && first_goal_)
+    {
+        double shortest_dist = 100.0;
+        int shortest_index = 0.0;
+        for (int i = 0; i < path_.poses.size(); i++)
+        {
+            double distance = getDistanceError(path_.poses.at(i));
+            if (distance < shortest_dist)
+            {
+                shortest_dist = distance;
+                shortest_index = i;
+            }
+        }
+        path_index_ = shortest_index;
+        first_goal_ = false;
     }
 
     if (in_emergency_mode_)
@@ -265,7 +288,8 @@ void pController::move()
 
 void pController::dancey_dance()
 {
-    if (!dancing_) return;
+    if (!dancing_)
+        return;
 
     // Get current yaw
     tf2::Quaternion q(
@@ -286,8 +310,10 @@ void pController::dancey_dance()
 
     // Compute delta with wrap-around
     double delta = yaw_now - yaw_dance_last_;
-    if (delta > M_PI) delta -= 2 * M_PI;
-    if (delta < -M_PI) delta += 2 * M_PI;
+    if (delta > M_PI)
+        delta -= 2 * M_PI;
+    if (delta < -M_PI)
+        delta += 2 * M_PI;
 
     yaw_dance_accumulated_ += std::abs(delta);
     yaw_dance_last_ = yaw_now;
@@ -306,7 +332,8 @@ void pController::dancey_dance()
         yaw_dance_accumulated_ = 0.0;
         first_dance_step_ = true;
 
-        if (dance_stage_ == 0) {
+        if (dance_stage_ == 0)
+        {
             dance_cycles_++;
         }
 
@@ -327,7 +354,6 @@ void pController::dancey_dance()
     twist.angular.z = (dance_stage_ == 0) ? 0.5 : -0.5;
     cmd_vel_pub_->publish(twist);
 }
-
 
 void pController::turn_and_look_for_art()
 {

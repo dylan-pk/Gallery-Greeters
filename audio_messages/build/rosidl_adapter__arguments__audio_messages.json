@@ -1,7 +1,0 @@
-{
-  "package_name": "audio_messages",
-  "non_idl_tuples": [
-    "/home/alec/git/Gallery-Greeters/audio_messages:msg/AudioData.msg",
-    "/home/alec/git/Gallery-Greeters/audio_messages:msg/AudioInfo.msg"
-  ]
-}

@@ -98,6 +98,9 @@ private:
     bool first_dance_step_ = true;
 
 
+    bool first_goal_ = true;
+
+
 
 };
 
