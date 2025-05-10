@@ -11,11 +11,12 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseStamped
 from builtin_interfaces.msg import Time
 import threading
+from std_msgs.msg import Int32
 
 DURATION = 2000
 WPM = 160
-GREETLOCATION = [1,1]
-CHARGINGLOCATION = [2,2]
+GREETLOCATION = [1.0,1.0]
+CHARGINGLOCATION = [2.0,2.0]
 
 class Commands:
 
@@ -45,30 +46,31 @@ class Commands:
         # monitor = get_monitors()[1] # this will allow us to put it on the second screen
         self.display_event = threading.Event()
         monitors = get_monitors()
-        print(monitors)
+        self.root = tk.Tk()
+        # print(moSnitors)
         if len(monitors) > 1:
             maxx = 0
             for i, mon in enumerate(monitors):
                 if mon.x != 0 and mon.x > maxx:
                     maxx = mon.x
                     self.monitor = monitors[i]
+            
+            self.screenWidth, self.screenHeight = self.monitor.width, self.monitor.height
+            self.root.geometry(f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}") # attaching the root to the second screen
+            self.root.attributes('-fullscreen', True)
+            self.root.bind("<Escape>", lambda e: self.root.destroy())
         else:
-            self.monitor = monitors[0]
-        self.root = tk.Tk()
-
-        ## Data needed to make images halfscreen
-        # self.screen_width = self.root.winfo_screenwidth()
-        # self.screen_height = self.root.winfo_screenheight()
-        # # Half size
-        # self.half_width = self.screen_width // 2
-        # self.half_height = self.screen_height // 2
-        # self.root.geometry(f"{self.half_width}x{self.half_height}")
+            # Data needed to make images halfscreen
+            self.screen_width = self.root.winfo_screenwidth()
+            self.screen_height = self.root.winfo_screenheight()
+            # Half size
+            self.half_width = self.screen_width // 2
+            self.screenWidth= self.half_width
+            self.half_height = self.screen_height // 2
+            self.screenHeight= self.half_height
+            self.root.geometry(f"{self.half_width}x{self.half_height}")
         
         # Establishing the root used
-        self.root.geometry(f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}") # attaching the root to the second screen
-        self.root.attributes('-fullscreen', True)
-        self.root.bind("<Escape>", lambda e: self.root.destroy())
-
         self.root.after(100, self.process_gui_queue)
         
         ## Establishing all the images
@@ -89,28 +91,10 @@ class Commands:
             except Exception as e:
                 print(f"GUI Error: {e}")
         self.root.after(100, self.process_gui_queue)
-    
-    # def displayNowAndContinue(self, image, continue_func=None, manualReset=True):
-    #     self.display_event.clear()
-
-    #     # Put image display function on the queue
-    #     self.queue.put(lambda: self.fullScreenImage(image, manualReset=manualReset))
-
-    #     # Immediately process the GUI queue so the image displays right away
-    #     while not self.queue.empty():
-    #         try:
-    #             func = self.queue.get_nowait()
-    #             func()
-    #         except Exception as e:
-    #             print(f"[displayNowAndContinue] Error: {e}")
-
-    #     # Optionally continue with some function (e.g., speaking)
-    #     if continue_func is not None:
-    #         continue_func()
 
     def pushToQueue(self, file, duration, manualReset=False):
         self.display_event.clear()
-        print(f"display event cleared so it's {self.display_event.is_set()}")
+        # print(f"display event cleared so it's {self.display_event.is_set()}")
         self.queue.empty()
         self.queue.put(lambda: self.fullScreenImage(file, duration, manualReset))
 
@@ -124,26 +108,26 @@ class Commands:
         
     def loadInfo(self):
         # Robot Faces
-        self.default_image = Image.open("audio_messages/src/resources/default.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        self.dancingFace = Image.open("audio_messages/src/resources/danceFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        self.chargeFace = Image.open("audio_messages/src/resources/chargeFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        self.callingFace = Image.open("audio_messages/src/resources/callingWaiter.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.default_image = Image.open("src/resources/default.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.dancingFace = Image.open("src/resources/danceFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.chargeFace = Image.open("src/resources/chargeFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.callingFace = Image.open("src/resources/callingWaiter.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
 
         # Information about Artwork        
-        with open("audio_messages/src/resources/ArtworkInfo/artworkInfo.txt", "r") as artFile:
+        with open("src/resources/ArtworkInfo/artworkInfo.txt", "r") as artFile:
             self.artworks = artFile.readline().split("/")
             self.artInfo = artFile.readlines()
-        self.artImages = {a: Image.open(f"audio_messages/src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.artImages = {a: Image.open(f"src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
                            for a in range(5)}
 
         # Fun Facts
-        with open("audio_messages/src/resources/FunFacts/funfacts.txt", "r") as factFile:
+        with open("src/resources/FunFacts/funfacts.txt", "r") as factFile:
             self.facts = factFile.readlines()
-        self.factImages = {i: Image.open(f"audio_messages/src/resources/FunFacts/image{i}.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.factImages = {i: Image.open(f"src/resources/FunFacts/image{i}.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
                            for i in range(10)}
         
         # Table Database
-        self.tables = TableDatabase("audio_messages/src/resources/tableInfo.txt")
+        self.tables = TableDatabase("src/resources/tableInfo.txt")
     
     def establishLocations(self, location_x, location_y):
         goal = PoseStamped()
@@ -174,9 +158,9 @@ class Commands:
                 # Store a reference to prevent garbage collection
                 self.label.image = tk_image
                 self.label.configure(image=tk_image)
-                print(f"display event before {self.display_event.is_set()}")
+                # print(f"display event before {self.display_event.is_set()}")
                 self.display_event.set()
-                print(f"display event after {self.display_event.is_set()}")
+                # print(f"display event after {self.display_event.is_set()}")
                 # Optionally reset image after duration
                 if not manualReset:
                     self.root.after(duration, self.resetToDefault)
@@ -197,7 +181,7 @@ class Commands:
             self.display_event.wait()
         else:
             time.sleep(0.5)
-        print("speaking now")
+        # print("speaking now")
         self.engine.say(command)
         # The say function does not work without a run and wait command
         self.engine.runAndWait()
@@ -214,26 +198,28 @@ class Commands:
 ############################################################## SPECIFIC COMMAND FUNCTONS ##########################################################################
     
     def modeChange(self, mode):
+        ros_msg = Int32()
+        ros_msg.data = mode
         match mode:
             case 0: # Greet Guests
-                self.publisher_movementMode.publish(mode)
+                self.publisher_movementMode.publish(ros_msg)
                 print("Greeting Guests Command Recognised")
                 self.SpeakText("going to door to greet guests")
                 self.publisher_location.publish(self.establishLocations(GREETLOCATION[0], GREETLOCATION[1]))
 
             case 1: # Wander Around
-                self.publisher_movementMode.publish(mode)
+                self.publisher_movementMode.publish(ros_msg)
                 print("Wander Command Recognised")
-                self.SpeakText("beginning wander mode")
+                self.SpeakText("beginning sentry mode")
 
             case 2: # Dance Mode
-                self.publisher_movementMode.publish(mode)
+                self.publisher_movementMode.publish(ros_msg)
                 print("dance mode activated")
                 self.pushToQueue(self.dancingFace,DURATION)
                 self.SpeakText("Dancey Dancey")
             
             case 3: # Go to Charging Port
-                self.publisher_movementMode.publish(mode)
+                self.publisher_movementMode.publish(ros_msg)
                 print("Charging Command Recognised")
                 self.pushToQueue(self.chargeFace,DURATION)
                 self.SpeakText("returning to charging port")
@@ -272,7 +258,7 @@ class Commands:
 
     def tableStatus(self):
         print("Table Status Command Registered")
-        statusImage = self.tables.generateTableStatusImage(self.monitor.width, self.monitor.height)
+        statusImage = self.tables.generateTableStatusImage(self.screenWidth, self.screenHeight)
         self.pushToQueue(statusImage, DURATION)
 
     def callWaiter(self, location):

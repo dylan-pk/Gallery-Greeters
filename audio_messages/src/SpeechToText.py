@@ -5,6 +5,9 @@ from commands import Commands
 from std_msgs.msg import Int32
 # from tableOrganisation import TableDatabase
 from PIL import Image
+import pvporcupine as porcu
+import sounddevice as sd
+import struct
 
 import threading
 from rclpy.node import Node
@@ -21,6 +24,8 @@ audio_to_main_queue = queue.Queue()
 main_to_gui_queue = queue.Queue()
 
 TESTING_MODE = False
+ACCESS_KEY = "8HEM095Qo29k5b/OQ01LPFlr+FfiUHVRi0k1N1rYnUQ2ZvZuig2zdA=="
+READY_FOR_COMMAND = False
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
 class SpeechToText(Node):
@@ -29,78 +34,80 @@ class SpeechToText(Node):
     def __init__(self, audio_queue, gui_queue):
         super().__init__('speech_to_text')
         self.audio_queue = audio_queue
-        # initialising a recnogiser
+        # initialising a recogniser
         self.r = sr.Recognizer()
         # creating pyaudio object so debugging
         self.device = pyaudio.PyAudio()
-        print(self.device.get_default_input_device_info())
+        # print(self.device.get_default_input_device_info())
         self.deviceNum = self.device.get_default_input_device_info()["index"]
 
         self.listening_event = threading.Event()
-        self.listening_event.set()
-        # self.listeningEnabled = True
-        # self.startVoiceRecognition()
 
-        self.availabledrinks = Image.open("audio_messages/src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.availabledrinks = Image.open("src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
 
         self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
         self.mode_pub = self.create_publisher(Int32, '/robot_mode', 10)
         self.comms = Commands(self, gui_queue)
         self.numOfTables = self.comms.getNumofTables()
-        # imagesThread = threading.Thread(target=self.comms.runGUI, daemon=True)
-        # imagesThread.start()
         
 
     def startVoiceRecognition(self):
+        print("voice recognition Thread started")
         audioThread = threading.Thread(target=self.commandAudioRecordingLoop, daemon=True)
         audioThread.start()
+    
+    def setListenEvent(self):
+        print("listening event set")
+        self.retry_count = 0
+        self.listening_event.set()
     
     def commandAudioRecordingLoop(self):
         while True:
             # print(f"loop of audio recording, listening enabled is {self.listeningEnabled}")
             self.listening_event.wait() # using a threading event so if multi prompt stuff is happening then the command audio loop doesn't get confused
-            if TESTING_MODE == False:
-                recordedText = self.audioRecording(self.deviceNum, "Run", 1)
-                if recordedText != None:
-                    # audio_to_main_queue.put(recordedText)
-                    threading.Thread(target=self.processText, args=(recordedText,), daemon=True).start()
-            else:
-                # self.processText("",testing=True)
-                threading.Thread(target=self.processText, args=("",), kwargs={"testing": True}, daemon=True).start()
+            while self.listening_event.is_set():
+                if TESTING_MODE == False:
+                    recordedText = self.audioRecording(self.deviceNum, "Run", 1)
+                    if recordedText != None:
+                        threading.Thread(target=self.processText, args=(recordedText,), daemon=True).start()
+                else:
+                    threading.Thread(target=self.processText, args=("",), kwargs={"testing": True}, daemon=True).start()
 
     def processText(self, text, testing = False):
-        print(f"processing, listening is disabled")
-        self.listening_event.clear()
+        # print(f"processing, listening is disabled")
         if testing == False:
             words = text.split()
             for word in words:
                 match word:
                     case "greeting":
+                        self.listening_event.clear()
                         self.comms.modeChange(0) # Waiting for how to send data
                     case "drink":
-                        # self.comms.fullScreenImage(self.availabledrinks, 0, True)
+                        self.listening_event.clear()
                         self.comms.pushToQueue(self.availabledrinks, 0, True)
-                        # threading.Thread(target=self.getDrinkOrder, daemon=True).start()
                         self.getDrinkOrder()
                     case "art":
+                        self.listening_event.clear()
                         self.comms.artWorkInfo() # COMMAND CODE DONE
                     case "walk":
+                        self.listening_event.clear()
                         self.comms.modeChange(1) # Waiting for how to send data
                     case "charge":
-                        self.comms.modeChange(2) # Face Change / Waiting for how to send data
+                        self.listening_event.clear()
+                        self.comms.modeChange(3) # Face Change / Waiting for how to send data
                     case "table":
+                        self.listening_event.clear()
                         self.tableCommands(words)
-                    #     table = self.getTable()
-                    #     self.comms.goToTable(table) # Waiting for how to send data
-                    # case "status":
-                    #     self.comms.tableStatus() # COMMAND CODE DONE
                     case "waiter":
+                        self.listening_event.clear()
                         currentPosition = [0,0,0] # Get currentPosition value and pass it in
                         self.comms.callWaiter(currentPosition) # Face Change / Waiting for how to send data
                     case "fact":
+                        self.listening_event.clear()
                         self.comms.funFact() # COMMAND CODE DONE
                     case "dance":
-                        self.comms.modeChange(3) # Waiting for how to send data
+                        self.listening_event.clear()
+                        self.comms.modeChange(2) # Waiting for how to send data
                     case _:
                         # print("Not a command word")
                         pass
@@ -110,41 +117,50 @@ class SpeechToText(Node):
             commandNum = int(input("Which Command: "))
             match commandNum:
                     case 1:
-                        self.comms.modeChange(0)
+                        self.listening_event.clear()
+                        self.comms.modeChange(0) # Waiting for how to send data
                     case 2:
+                        self.listening_event.clear()
                         self.comms.pushToQueue(self.availabledrinks, 0, True)
                         self.getDrinkOrder()
                     case 3:
-                        self.comms.artWorkInfo()
+                        self.listening_event.clear()
+                        self.comms.artWorkInfo() # COMMAND CODE DONE
                     case 4:
-                        self.comms.modeChange(1)
+                        self.listening_event.clear()
+                        self.comms.modeChange(1) # Waiting for how to send data
                     case 5:
-                        self.comms.modeChange(2)
+                        self.listening_event.clear()
+                        self.comms.modeChange(2) # Face Change / Waiting for how to send data
                     case 6:
+                        self.listening_event.clear()
                         table = self.getTable()
                         self.comms.goToTable(table)
-                            # self.tableCommands(words)
                     case 7:
+                        self.listening_event.clear()
                         self.comms.tableStatus()
                     case 8:
+                        self.listening_event.clear()
                         currentPosition = [0,0,0] # Get currentPosition value and pass it in
-                        self.comms.callWaiter(currentPosition)
+                        self.comms.callWaiter(currentPosition) # Face Change / Waiting for how to send data
                     case 9:
-                        self.comms.funFact()
+                        self.listening_event.clear()
+                        self.comms.funFact() # COMMAND CODE DONE
                     case 10:
-                        self.comms.modeChange(3)
+                        self.listening_event.clear()
+                        self.comms.modeChange(3) # Waiting for how to send data
                     case _:
                         # print("Not a command word")
                         pass
-        self.listening_event.set()
-        print(f"at the end of process text listening is enabled")
+        
+        # print(f"at the end of process text listening remains disabled until next wake word")
 
     
     def tableCommands(self, sentence):
         print("In table commands function")
         go_to_table = True
         for word in sentence:
-            if word == "status":
+            if word == "status" or word == "tell" or word == "show":
                 go_to_table = False
         if go_to_table:
             table = self.getTable()
@@ -153,7 +169,7 @@ class SpeechToText(Node):
             self.comms.tableStatus()
     
     def getDrinkOrder(self):
-        print(f"Drink Order Command")
+        # print(f"Drink Order Command")
         drinks = [["Carlton",0],["Soda", 0],["Champagne", 0]]
         table = 0
         ordering = True
@@ -218,7 +234,6 @@ class SpeechToText(Node):
                 
         
         self.comms.queue.put(lambda: self.comms.resetToDefault())
-        self.listening_event.set()
         self.comms.SpeakText("Drink Order Sent")
         self.comms.sendDrinkOrder(drinks, table)
         print(f"at the end of drink order listening is disabled")
@@ -247,71 +262,45 @@ class SpeechToText(Node):
             for word in response_words:
                 if word.isdigit():
                     if int(word) < self.numOfTables:
-                        self.listening_event.set()
                         return int(word)
                 
-    def audioRecording(self, device, function, promptNum):
-        # validResponse = False
-        # while(validResponse == False):
-        #     try:
-        #         with sr.Microphone(device_index=device) as source2:
-        #             # wait for a second to let the recognizer
-        #             # adjust the energy threshold based on
-        #             # the surrounding noise level 
-        #             self.r.adjust_for_ambient_noise(source2, duration=0.2)
-
-        #             #listens for the user's input 
-        #             audio2 = self.r.listen(source2)
-
-        #             # Using google to recognize audio
-        #             MyText = self.r.recognize_google(audio2)
-        #             MyText = MyText.lower()
-
-        #             print(function + " prompt #" + str(promptNum) + " response is: ", MyText)
-        #             if MyText != None:
-        #                 validResponse = True
-        #                 return MyText
-        #             # SpeakText(MyText)
-
+    def audioRecording(self, device, function, promptNum):            
             with sr.Microphone(device_index=device) as source2:
                 self.r.adjust_for_ambient_noise(source2, duration=0.5)  # Adjust to background noise
                 print("Listening...")
 
                 # Continuously listen for speech and stop when silence is detected
                 while True:
-                    audio2 = self.r.listen(source2)
-                    try:
-                        MyText = self.r.recognize_google(audio2).lower()
-                        print(f"Detected speech: {MyText}")
+                    if function == "Run" and self.listening_event.is_set() == False:
+                        self.listening_event.wait()
+                    else:
+                        audio2 = self.r.listen(source2)
+                        try:
+                            MyText = self.r.recognize_google(audio2).lower()
+                            # print(f"Detected speech: {MyText}")
 
-                        if MyText != None:  # If text is not empty
-                            print(function + " prompt #" + str(promptNum) + " response is: ", MyText)
-                            return MyText  # Stop recording and return text
+                            if MyText != None:  # If text is not empty
+                                print(function + " prompt #" + str(promptNum) + " response is: ", MyText)
+                                return MyText  # Stop recording and return text
 
 
-                    except sr.RequestError as e:
-                        print("Could not request results; {0}".format(e))
+                        except sr.RequestError as e:
+                            print("Could not request results; {0}".format(e))
 
-                    except sr.UnknownValueError:
-                        # print("unknown error occurred")
-                        print("Silence detected, stopping recording...")
-                        retry = self.audioRecording(device,function,promptNum)
-                        if retry != None:
-                            return retry
-                        else:
-                            return None  # Stop if no speech is recognized
-
-    # def run(self):
-    #     while True:
-    #         if TESTING_MODE:
-    #             self.processText("",testing=True)
-            # else:
-            #     while(1):
-            #         recordedText = self.audioRecording(self.deviceNum, "Run", 1)
-            #         # if recordedText != None:
-            #         #     usableText = recordedText
-            #         if recordedText != None:
-            #             self.processText(recordedText)
+                        except sr.UnknownValueError:
+                            # print("unknown error occurred")
+                            print("Silence detected, stopping recording...")
+                            self.retry_count += 1
+                            print(f"amount of retrys is {self.retry_count}")
+                            if self.retry_count >= 10:
+                                self.listening_event.clear()
+                                return None
+                            else:
+                                retry = self.audioRecording(device,function,promptNum)
+                                if retry != None:
+                                    return retry
+                                else:
+                                    return None  # Stop if no speech is recognized
 
 def main(args=None):
     rclpy.init(args=args)
@@ -321,12 +310,25 @@ def main(args=None):
     executor.add_node(node)
 
     node.startVoiceRecognition()
-    # rclpy.spin(node)
-    # node.destroy_node()
-    # rclpy.shutdown()
+
+    wakeDetection = porcu.create(access_key=ACCESS_KEY, keywords=['jarvis'])
+    wakeAudioStream = sd.RawInputStream(samplerate=wakeDetection.sample_rate, blocksize=wakeDetection.frame_length, dtype='int16', channels=1)
+    wakeAudioStream.start()
+    READY_FOR_COMMAND = False
     try:
         while True:
+            pcm = wakeAudioStream.read(wakeDetection.frame_length)[0]
+            pcm = struct.unpack_from("h" * wakeDetection.frame_length, pcm)
+            keyword_index = wakeDetection.process(pcm)
+            if keyword_index >= 0:
+                # Send ROS Message to stop movement
+                READY_FOR_COMMAND = True
+                print("wake word detected")
+
             executor.spin_once(timeout_sec=0.01)
+            if READY_FOR_COMMAND:
+                node.setListenEvent()
+                READY_FOR_COMMAND = False
 
             node.comms.root.update_idletasks()
             node.comms.root.update()
