@@ -8,6 +8,7 @@ from PIL import Image
 import pvporcupine as porcu
 import sounddevice as sd
 import struct
+from example_interfaces.srv import SetBool
 
 import threading
 from rclpy.node import Node
@@ -43,7 +44,10 @@ class SpeechToText(Node):
 
         self.listening_event = threading.Event()
 
-        self.availabledrinks = Image.open("src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.availabledrinks = Image.open("audio_messages/src/resources/available_drinks.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+
+        self.client_artIdentification = self.create_client(SetBool, 'perform_template_matching')
+        self.artReq = SetBool.Request()
 
         self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
         self.mode_pub = self.create_publisher(Int32, '/robot_mode', 10)
@@ -88,7 +92,8 @@ class SpeechToText(Node):
                         self.getDrinkOrder()
                     case "art":
                         self.listening_event.clear()
-                        self.comms.artWorkInfo() # COMMAND CODE DONE
+                        self.artWorkInfo()
+                        # self.comms.artWorkInfo() # COMMAND CODE DONE
                     case "walk":
                         self.listening_event.clear()
                         self.comms.modeChange(1) # Waiting for how to send data
@@ -251,6 +256,16 @@ class SpeechToText(Node):
             else:
                 pass
         return number
+    
+    def artWorkInfo(self):
+        print("we got in here")
+        self.artReq.data = True
+        self.future = self.client_artIdentification.call_async(self.artReq)
+        rclpy.spin_until_future_complete(self, self.future)
+        artResponse = self.future.result()
+        print(f"the response was {artResponse}")
+        if artResponse.success:
+            self.comms.artWorkInfo(artResponse.message)
 
     def getTable(self):
         self.listening_event.clear()
@@ -302,14 +317,29 @@ class SpeechToText(Node):
                                 else:
                                     return None  # Stop if no speech is recognized
 
+class DebugServiceServer(Node):
+    def __init__(self):
+        super().__init__('debug_service_server')
+        self.create_service(SetBool, 'perform_template_matching', self.handle_template_matching)
+
+    def handle_template_matching(self, request, response):
+        self.get_logger().info(f'Received request: {request}')
+        response.success = True
+        response.message = "Scene from Moby Dick"
+        # "Scene from Moby Dick"  # Send dummy response
+        return response
+
 def main(args=None):
     rclpy.init(args=args)
     node = SpeechToText(audio_to_main_queue, main_to_gui_queue)
+    # test_node = DebugServiceServer()
 
     executor = MultiThreadedExecutor()
     executor.add_node(node)
+    # executor.add_node(test_node)
 
     node.startVoiceRecognition()
+    # rclpy.spin(test_node)
 
     wakeDetection = porcu.create(access_key=ACCESS_KEY, keywords=['jarvis'])
     wakeAudioStream = sd.RawInputStream(samplerate=wakeDetection.sample_rate, blocksize=wakeDetection.frame_length, dtype='int16', channels=1)
@@ -344,6 +374,7 @@ def main(args=None):
         print("Tkinter GUI Closed")
     finally:
         executor.shutdown()
+        # test_node.destroy_node()
         node.destroy_node()
         rclpy.shutdown()
 

@@ -10,8 +10,9 @@ from screeninfo import get_monitors
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseStamped
 from builtin_interfaces.msg import Time
-import threading
 from std_msgs.msg import Int32
+
+import threading
 
 DURATION = 2000
 WPM = 160
@@ -36,8 +37,6 @@ class Commands:
 
         ## ROS Topics and stuff
         self.subscriber_currentPos = node.create_subscription(Odometry, '/odom', self.odom_callback, 10)
-
-        # self.service_artIdentification
 
         # self.publisher_drinkOrders
         self.publisher_movementMode = node.mode_pub
@@ -108,26 +107,26 @@ class Commands:
         
     def loadInfo(self):
         # Robot Faces
-        self.default_image = Image.open("src/resources/default.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        self.dancingFace = Image.open("src/resources/danceFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        self.chargeFace = Image.open("src/resources/chargeFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        self.callingFace = Image.open("src/resources/callingWaiter.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.default_image = Image.open("audio_messages/src/resources/default.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.dancingFace = Image.open("audio_messages/src/resources/danceFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.chargeFace = Image.open("audio_messages/src/resources/chargeFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.callingFace = Image.open("audio_messages/src/resources/callingWaiter.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
 
         # Information about Artwork        
-        with open("src/resources/ArtworkInfo/artworkInfo.txt", "r") as artFile:
+        with open("audio_messages/src/resources/ArtworkInfo/artworkInfo.txt", "r") as artFile:
             self.artworks = artFile.readline().split("/")
             self.artInfo = artFile.readlines()
-        self.artImages = {a: Image.open(f"src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.artImages = {a: Image.open(f"audio_messages/src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
                            for a in range(5)}
 
         # Fun Facts
-        with open("src/resources/FunFacts/funfacts.txt", "r") as factFile:
+        with open("audio_messages/src/resources/FunFacts/funfacts.txt", "r") as factFile:
             self.facts = factFile.readlines()
-        self.factImages = {i: Image.open(f"src/resources/FunFacts/image{i}.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        self.factImages = {i: Image.open(f"audio_messages/src/resources/FunFacts/image{i}.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
                            for i in range(10)}
         
         # Table Database
-        self.tables = TableDatabase("src/resources/tableInfo.txt")
+        self.tables = TableDatabase("audio_messages/src/resources/tableInfo.txt")
     
     def establishLocations(self, location_x, location_y):
         goal = PoseStamped()
@@ -229,12 +228,12 @@ class Commands:
         for i in range(3):
             print("Ordering " + str(drinks[i][1]) + " " + str(drinks[i][0]) + "s")
     
-    def artWorkInfo(self):
+    def artWorkInfo(self, artwork):
         # Read closest artwork from publisher
-        print("Artwork Info Command Registered")
+        print(f"Artwork Info Command Registered, artwork recieved is {artwork}")
         # print(f"1: {self.artworks[0]}\n2: {self.artworks[1]}\n3: {self.artworks[2]}\n4: {self.artworks[3]}\n5: {self.artworks[4]}")
         # response = # Response from the service
-        artwork = 1# int(input("Artwork: ")) # response.message # This will be changed to recieve the name of the painting from the visual subsystem
+        # artwork = 1# int(input("Artwork: ")) # response.message # This will be changed to recieve the name of the painting from the visual subsystem
         # if response.success == True:
         if artwork == self.artworks[0] or artwork == 1: # The Ugly Duchess
                 self.pushToQueue(self.artImages[0], (self.speakingTimeEst(self.artInfo[0]) + DURATION))
