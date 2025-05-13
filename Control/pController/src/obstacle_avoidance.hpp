@@ -1,79 +1,53 @@
-#ifndef OBSTACLEAVOIDANCE_HPP
-#define OBSTACLEAVOIDANCE_HPP
+#ifndef OBSTACLE_AVOIDANCE_HPP
+#define OBSTACLE_AVOIDANCE_HPP
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
+#include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/point.hpp>
+#include <nav_msgs/msg/occupancy_grid.hpp>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <nav_msgs/msg/odometry.hpp>
-#include "geometry_msgs/msg/pose_stamped.hpp"
-#include "nav_msgs/msg/path.hpp"
-#include <tf2/utils.h>
-#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include <cmath>
-#include <algorithm>
 
-
-
-
-class ObstacleAvoidance: public rclcpp::Node
+class ObstacleAvoidance : public rclcpp::Node
 {
 public:
-
     ObstacleAvoidance();
 
-    virtual bool isGoalObstructed(const nav_msgs::msg::Odometry &odom, const geometry_msgs::msg::Point &goal);
-
-    bool isGoalInsideObstacle(const nav_msgs::msg::Odometry &odom, const geometry_msgs::msg::Point &goal);
-    
-    virtual geometry_msgs::msg::Twist adjustVelocity(const geometry_msgs::msg::Twist &original_cmd);
-    
-    virtual geometry_msgs::msg::PoseStamped suggestNewGoal(const geometry_msgs::msg::PoseStamped &original_goal, const geometry_msgs::msg::PoseStamped &next_goal, double attraction, double repulsion, double goal_step);
-
-    bool isPathObstructed();
-
-    geometry_msgs::msg::Twist avoidCollision();
-
-    geometry_msgs::msg::PoseStamped suggestNewGoalSafe();
-
-    bool isPathToGoalObstructed(const geometry_msgs::msg::Point& start,
-                                const geometry_msgs::msg::Point& goal, double front_dist, double side_dist) const;
-
-    bool collisionIminent(const nav_msgs::msg::Odometry &odom);
-
-    bool collisionTooClose(const nav_msgs::msg::Odometry &odom, double clearance);
-
-    bool isGoalReachableDespiteObstruction(
-    const geometry_msgs::msg::PoseStamped &goal,
-    double max_distance,
-    double max_angle_rad,
-    double clearance_radius) const;
-
 private:
+    void laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
+    void staticObstaclesCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg);
+    void staticMapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
+    void publishUnknownObstacles();
 
-    double shortestAngularDistance(double from, double to);
+    bool is_known_static_obstacle(const geometry_msgs::msg::Point &pt, double threshold) const;
+    std::vector<geometry_msgs::msg::Point> getFilteredLaserPoints() const;
 
-    void laserCallback(const std::shared_ptr<sensor_msgs::msg::LaserScan> msg);
-
-    void odomCallback(const std::shared_ptr<nav_msgs::msg::Odometry> msg);
-
-    nav_msgs::msg::Odometry getOdometry(void);
-    
-    geometry_msgs::msg::Point localToGlobal(nav_msgs::msg::Odometry global, geometry_msgs::msg::Point local) const;
-
-    std::vector<geometry_msgs::msg::Point> getLaserPoints() const;
-
-
-    
-    
-    geometry_msgs::msg::Point getFurthestFrontLaserPoint(
-    const geometry_msgs::msg::Point &robot_pos,
-    const std::vector<geometry_msgs::msg::Point> &laser_points);
-
-    
+    // ROS
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_sub_;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odo_;
-    sensor_msgs::msg::LaserScan scan_;
-    nav_msgs::msg::Odometry odo_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr static_obs_sub_;
+    rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr static_map_sub_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr unknown_grid_pub_;
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    // TF
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+
+    // Data
+    sensor_msgs::msg::LaserScan latest_scan_;
+    nav_msgs::msg::MapMetaData map_info_;
+    bool map_ready_ = false;
+    std::vector<geometry_msgs::msg::Point> known_static_obstacles_;
+
+
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+nav_msgs::msg::Odometry current_odom_;
+
+void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
+
 };
 
-#endif // OBSTACLEAVOIDANCE_HPP
+#endif

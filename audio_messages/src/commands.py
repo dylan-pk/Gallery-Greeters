@@ -9,15 +9,22 @@ from tableOrganisation import TableDatabase
 from screeninfo import get_monitors
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Path
 from builtin_interfaces.msg import Time
 from std_msgs.msg import Int32
+import math
+from geometry_msgs.msg import PoseStamped, Quaternion
+
 
 import threading
 
 DURATION = 2000
 WPM = 160
-GREETLOCATION = [1.0,1.0]
-CHARGINGLOCATION = [2.0,2.0]
+GREETLOCATION = [0.66,0.82, -1.57]
+CHARGINGLOCATION = [3.1, 3.25]
+SENTRYMODE = [[3.34, 2.45],[3.36, 1.76],[3.38, 1.75],[3.0, 0.88],[1.78, 0.93],[0.6, 1.05],[0.48, 2.61],[2.0, 2.39], [3.34, 2.45]]
+
+
 
 class Commands:
 
@@ -41,6 +48,7 @@ class Commands:
         # self.publisher_drinkOrders
         self.publisher_movementMode = node.mode_pub
         self.publisher_location = node.goal_pub
+        self.publisher_path = node.publisher_path
 
         # monitor = get_monitors()[1] # this will allow us to put it on the second screen
         self.display_event = threading.Event()
@@ -114,10 +122,17 @@ class Commands:
 
         # Information about Artwork        
         with open("audio_messages/src/resources/ArtworkInfo/artworkInfo.txt", "r") as artFile:
-            self.artworks = artFile.readline().split("/")
+            self.artNames = artFile.readline().split("/")
+            self.artLocation = artFile.readline().split("/")
+            self.artworks = {}
+            for i, l in zip(self.artNames, self.artLocation):
+                self.artworks.update({i: l})
+            print(self.artworks)
             self.artInfo = artFile.readlines()
-        self.artImages = {a: Image.open(f"audio_messages/src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-                           for a in range(5)}
+        # self.artImages = {a: Image.open(f"audio_messages/src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
+        #                    for a in range(5)}
+        self.artImages = {name: Image.open(f"audio_messages/src/resources/ArtworkInfo/{name.strip()}_info.png")
+                            for name in list(self.artworks.keys())[:5]}
 
         # Fun Facts
         with open("audio_messages/src/resources/FunFacts/funfacts.txt", "r") as factFile:
@@ -128,13 +143,22 @@ class Commands:
         # Table Database
         self.tables = TableDatabase("audio_messages/src/resources/tableInfo.txt")
     
-    def establishLocations(self, location_x, location_y):
+    def getArtworkNames(self):
+        return self.artworks
+    
+    def establishLocations(self, location_x, location_y, theta = None):
         goal = PoseStamped()
         goal.header.frame_id = "map"
         goal.header.stamp = self.node.get_clock().now().to_msg() 
         goal.pose.position.x = location_x
         goal.pose.position.y = location_y
-        goal.pose.orientation.w = 1.0
+        if theta is not None:
+            qz = math.sin(theta / 2.0)
+            qw = math.cos(theta / 2.0)
+
+            goal.pose.orientation = Quaternion(x=0.0, y=0.0, z=qz, w=qw)
+        else:
+            goal.pose.orientation.w = 1.0
 
         return goal
 
@@ -210,6 +234,7 @@ class Commands:
                 self.publisher_movementMode.publish(ros_msg)
                 print("Wander Command Recognised")
                 self.SpeakText("beginning sentry mode")
+                self.sentryMode()
 
             case 2: # Dance Mode
                 self.publisher_movementMode.publish(ros_msg)
@@ -223,6 +248,22 @@ class Commands:
                 self.pushToQueue(self.chargeFace,DURATION)
                 self.SpeakText("returning to charging port")
                 self.publisher_location.publish(self.establishLocations(CHARGINGLOCATION[0], CHARGINGLOCATION[1]))
+            case 4: #go to table
+                self.publisher_movementMode.publish(ros_msg)
+                self.pushToQueue(self.chargeFace,DURATION)
+                self.SpeakText("Going to table")
+
+    def sentryMode(self):
+        path_msg = Path()
+        path_msg.header.frame_id = 'map'
+        path_msg.header.stamp = self.node.get_clock().now().to_msg() 
+
+        for goal in SENTRYMODE:
+            goal_pose = PoseStamped()
+            goal_pose = self.establishLocations(goal[0], goal[1])
+            path_msg.poses.append(goal_pose)
+        
+        self.publisher_path.publish(path_msg)
 
     def sendDrinkOrder(self, drinks, table):
         for i in range(3):
@@ -270,12 +311,12 @@ class Commands:
         tableLocation = self.tables.findTableLocation(table)
         self.SpeakText(f"follow me to table {str(table)}")
         print(f"Go To Table Command Recognised, Table Location is: {tableLocation}")
-        goal = PoseStamped()
-        goal.header.frame_id = "map"
-        goal.header.stamp = self.node.get_clock().now().to_msg() 
-        goal.pose.position.x = tableLocation[0]
-        goal.pose.position.y = tableLocation[1]
-        goal.pose.orientation.w = 1.0
+        # goal = PoseStamped()
+        # goal.header.frame_id = "map"
+        # goal.header.stamp = self.node.get_clock().now().to_msg() 
+        # goal.pose.position.x = tableLocation[0]
+        # goal.pose.position.y = tableLocation[1]
+        # goal.pose.orientation.w = 1.0
         self.publisher_location.publish(self.establishLocations(tableLocation[0], tableLocation[1]))
 
 

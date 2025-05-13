@@ -54,8 +54,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr mode_sub_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr interrupt_sub_;
 
-    double Kp_linear;
-    double Kp_angular;
+    // double Kp_linear;
+    // double Kp_angular;
     double tolerance;
 
     nav_msgs::msg::Odometry odo_;
@@ -99,6 +99,22 @@ private:
 
 
     bool first_goal_ = true;
+
+    void replaceGoalsNearUnknownObstacles(int num_goals_to_check, double danger_radius);
+
+    // PID parameters
+// In p_controller.hpp
+double Kp_linear, Ki_linear, Kd_linear;
+double Kp_angular, Ki_angular, Kd_angular;
+
+double prev_linear_error = 0.0;
+double prev_angular_error = 0.0;
+double sum_linear_error = 0.0;
+double sum_angular_error = 0.0;
+
+rclcpp::Time last_time;
+
+
 
 
 

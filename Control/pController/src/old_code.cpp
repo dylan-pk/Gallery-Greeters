@@ -1,3 +1,43 @@
+// Running Testing for andrews and lachys code 
+
+// 
+// export TURTLEBOT3_MODEL=waffle_pi
+// ros2 launch turtlebot3_gazebo Gallery_Test2.launch.py
+
+// export TURTLEBOT3_MODEL=waffle_pi
+// ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=true map:=/home/alec/ros2_ws/gallery_map.yaml
+
+// ros2 run p_controller p_controller 
+
+// ros2 run turtlebot_nav path_to_goal3
+
+
+// for one goal:
+// ros2 run turtlebot_nav goal_publisher 
+
+// for sentry mode:
+// ros2 topic pub /robot_mode std_msgs/msg/Int32 "{data: 1}" --once
+// ros2 run p_controller test_path_publisher 
+
+//interrupt
+//ros2 topic pub /interrupt_signal std_msgs/msg/Bool "{data: true}" --once
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // geometry_msgs::msg::PoseStamped ObstacleAvoidance::suggestNewGoal(
 //     const geometry_msgs::msg::PoseStamped &original_goal,
 //     const geometry_msgs::msg::PoseStamped &next_goal)

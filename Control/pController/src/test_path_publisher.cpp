@@ -9,7 +9,8 @@ class TestPathPublisher : public rclcpp::Node
 public:
   TestPathPublisher() : Node("test_path_publisher")
   {
-    path_pub_ = this->create_publisher<nav_msgs::msg::Path>("computed_path", 10);
+    // path_pub_ = this->create_publisher<nav_msgs::msg::Path>("computed_path", 10);
+    path_pub_ = this->create_publisher<nav_msgs::msg::Path>("sentry_path", 10);
     publish_test_path();
   }
 
@@ -118,6 +119,22 @@ public:
       {0.48, 2.61, 0.0},
       {2.0, 2.39, 0.0},
       {3.34, 2.45, 0.0}
+
+
+
+
+// 
+          // position:
+      // x: 0.5360413134142046
+      // y: 0.5577182565547301
+      // z: 0.11787779237489605
+    // orientation:
+      // x: 0.0028530754959622245
+      // y: 0.0013306447077517357
+      // z: -0.906416253060795
+      // w: 0.4223738457008259
+  // covariance:
+// 
 
 
 

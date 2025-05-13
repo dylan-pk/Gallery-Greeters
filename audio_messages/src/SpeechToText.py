@@ -2,7 +2,7 @@ import speech_recognition as sr
 import pyttsx3
 import pyaudio
 from commands import Commands
-from std_msgs.msg import Int32
+from std_msgs.msg import Int32, Bool
 # from tableOrganisation import TableDatabase
 from PIL import Image
 import pvporcupine as porcu
@@ -19,13 +19,14 @@ import time
 import tkinter as tk
 
 from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Path
 # spoken = False
 
 audio_to_main_queue = queue.Queue()
 main_to_gui_queue = queue.Queue()
 
-TESTING_MODE = False
-ACCESS_KEY = "8HEM095Qo29k5b/OQ01LPFlr+FfiUHVRi0k1N1rYnUQ2ZvZuig2zdA=="
+TESTING_MODE = True
+ACCESS_KEY = "UNuftCmjek2mefFH8OZiwT0LiaeSZJBcFdo1GaqCGcEiKTGQfR7vYQ=="# "8HEM095Qo29k5b/OQ01LPFlr+FfiUHVRi0k1N1rYnUQ2ZvZuig2zdA==" # -Anika
 READY_FOR_COMMAND = False
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
@@ -49,8 +50,10 @@ class SpeechToText(Node):
         self.client_artIdentification = self.create_client(SetBool, 'perform_template_matching')
         self.artReq = SetBool.Request()
 
-        self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
+        self.goal_pub = self.create_publisher(PoseStamped, '/pose_topic', 10)
         self.mode_pub = self.create_publisher(Int32, '/robot_mode', 10)
+        self.interrupt_pub = self.create_publisher(Bool,"/interrupt_signal", 10)
+        self.publisher_path = self.create_publisher(Path, '/sentry_path', 10)
         self.comms = Commands(self, gui_queue)
         self.numOfTables = self.comms.getNumofTables()
         
@@ -61,6 +64,7 @@ class SpeechToText(Node):
         audioThread.start()
     
     def setListenEvent(self):
+        self.interrupt_pub.publish(Bool(data=True))
         print("listening event set")
         self.retry_count = 0
         self.listening_event.set()
@@ -117,8 +121,9 @@ class SpeechToText(Node):
                         # print("Not a command word")
                         pass
         else:
+            self.listening_event.clear()
             print("1: Greet Guests\n2: Order a Drink\n3: Tell me about the art\n4: Wander Around\n"
-            "5: Go to Charging Station\n6: Go to a Table\n7: Get Table Status\n8: Call a waiter\n9: Tell me a Fun Fact\n10: Do a Dance")
+            "5: Do a Dance\n6: Go to a Table\n7: Get Table Status\n8: Call a waiter\n9: Tell me a Fun Fact\n10: Go to Charging Station")
             commandNum = int(input("Which Command: "))
             match commandNum:
                     case 1:
@@ -169,6 +174,7 @@ class SpeechToText(Node):
                 go_to_table = False
         if go_to_table:
             table = self.getTable()
+            self.comms.modeChange(4)
             self.comms.goToTable(table) # Waiting for how to send data
         else:
             self.comms.tableStatus()
@@ -256,9 +262,25 @@ class SpeechToText(Node):
             else:
                 pass
         return number
-    
+       
     def artWorkInfo(self):
         print("we got in here")
+        self.comms.SpeakText("which artwork would you like to know about")
+        artwork = self.audioRecording(self.deviceNum, "Art Request", 1)
+        actualArt = False
+        for word in artwork:
+            for art in self.comms.getArtworkNames():
+                if word == art:
+                    requestedArtwork = artwork
+                    actualArt = True
+                
+        if actualArt:
+            # go to the artwork then scan
+            pass
+        else:
+            # spin in a circle till you see artwork
+            pass
+        
         self.artReq.data = True
         self.future = self.client_artIdentification.call_async(self.artReq)
         rclpy.spin_until_future_complete(self, self.future)
@@ -269,15 +291,20 @@ class SpeechToText(Node):
 
     def getTable(self):
         self.listening_event.clear()
+        self.comms.modeChange(4)
         print("In get Table")
         self.comms.SpeakText("which table should I go to?")
-        response = self.audioRecording(self.deviceNum, "GetTable", 1)
-        if response != None:
-            response_words = response.split()
-            for word in response_words:
-                if word.isdigit():
-                    if int(word) < self.numOfTables:
-                        return int(word)
+        if TESTING_MODE:
+            response = int(input("Enter a table number: "))
+            return response
+        else:
+            response = self.audioRecording(self.deviceNum, "GetTable", 1)
+            if response != None:
+                response_words = response.split()
+                for word in response_words:
+                    if word.isdigit():
+                        if int(word) < self.numOfTables:
+                            return int(word)
                 
     def audioRecording(self, device, function, promptNum):            
             with sr.Microphone(device_index=device) as source2:
