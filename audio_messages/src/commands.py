@@ -14,6 +14,7 @@ from builtin_interfaces.msg import Time
 from std_msgs.msg import Int32
 import math
 from geometry_msgs.msg import PoseStamped, Quaternion
+import ast
 
 
 import threading
@@ -126,13 +127,16 @@ class Commands:
             self.artLocation = artFile.readline().split("/")
             self.artworks = {}
             for i, l in zip(self.artNames, self.artLocation):
-                self.artworks.update({i: l})
+                loc = ast.literal_eval(l)
+                self.artworks[i] = loc
+                # self.artworks.update({i: l})
             print(self.artworks)
             self.artInfo = artFile.readlines()
+            # print(self.artInfo)
         # self.artImages = {a: Image.open(f"audio_messages/src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
         #                    for a in range(5)}
-        self.artImages = {name: Image.open(f"audio_messages/src/resources/ArtworkInfo/{name.strip()}_info.png")
-                            for name in list(self.artworks.keys())[:5]}
+        self.artImages = {name: Image.open(f"audio_messages/src/resources/ArtworkInfo/{name.strip()}_info.png") for name in list(self.artworks.keys())[:5]}
+        # print(self.artImages)
 
         # Fun Facts
         with open("audio_messages/src/resources/FunFacts/funfacts.txt", "r") as factFile:
@@ -224,11 +228,14 @@ class Commands:
         ros_msg = Int32()
         ros_msg.data = mode
         match mode:
-            case 0: # Greet Guests
+            # case 0: # Greet Guests
+            #     self.publisher_movementMode.publish(ros_msg)
+            #     print("Greeting Guests Command Recognised")
+            #     self.SpeakText("going to door to greet guests")
+            #     self.publisher_location.publish(self.establishLocations(GREETLOCATION[0], GREETLOCATION[1]))
+            case 0: # Go to Artwork
                 self.publisher_movementMode.publish(ros_msg)
-                print("Greeting Guests Command Recognised")
-                self.SpeakText("going to door to greet guests")
-                self.publisher_location.publish(self.establishLocations(GREETLOCATION[0], GREETLOCATION[1]))
+                print("Entered Artwork Mode")
 
             case 1: # Wander Around
                 self.publisher_movementMode.publish(ros_msg)
@@ -241,17 +248,21 @@ class Commands:
                 print("dance mode activated")
                 self.pushToQueue(self.dancingFace,DURATION)
                 self.SpeakText("Dancey Dancey")
+
+            case 3: # Spin around for Artwork
+                self.publisher_movementMode.publish(ros_msg)
+                print("Spinning activated")
             
-            case 3: # Go to Charging Port
-                self.publisher_movementMode.publish(ros_msg)
-                print("Charging Command Recognised")
-                self.pushToQueue(self.chargeFace,DURATION)
-                self.SpeakText("returning to charging port")
-                self.publisher_location.publish(self.establishLocations(CHARGINGLOCATION[0], CHARGINGLOCATION[1]))
-            case 4: #go to table
-                self.publisher_movementMode.publish(ros_msg)
-                self.pushToQueue(self.chargeFace,DURATION)
-                self.SpeakText("Going to table")
+            # case 3: # Go to Charging Port
+            #     self.publisher_movementMode.publish(ros_msg)
+            #     print("Charging Command Recognised")
+            #     self.pushToQueue(self.chargeFace,DURATION)
+            #     self.SpeakText("returning to charging port")
+            #     self.publisher_location.publish(self.establishLocations(CHARGINGLOCATION[0], CHARGINGLOCATION[1]))
+            # case 4: #go to table
+            #     self.publisher_movementMode.publish(ros_msg)
+            #     self.pushToQueue(self.chargeFace,DURATION)
+            #     self.SpeakText("Going to table")
 
     def sentryMode(self):
         path_msg = Path()
@@ -268,33 +279,24 @@ class Commands:
     def sendDrinkOrder(self, drinks, table):
         for i in range(3):
             print("Ordering " + str(drinks[i][1]) + " " + str(drinks[i][0]) + "s")
+
+    def publishArtLocation(self, artwork):
+        print(f"publishing location: [{self.artworks[artwork][0]}, {self.artworks[artwork][1]}, {self.artworks[artwork][2]}]")
+        self.publisher_location.publish(self.establishLocations(float(self.artworks[artwork][0]), float(self.artworks[artwork][1]), float(self.artworks[artwork][2])))
     
     def artWorkInfo(self, artwork):
         # Read closest artwork from publisher
         print(f"Artwork Info Command Registered, artwork recieved is {artwork}")
-        # print(f"1: {self.artworks[0]}\n2: {self.artworks[1]}\n3: {self.artworks[2]}\n4: {self.artworks[3]}\n5: {self.artworks[4]}")
-        # response = # Response from the service
-        # artwork = 1# int(input("Artwork: ")) # response.message # This will be changed to recieve the name of the painting from the visual subsystem
-        # if response.success == True:
-        if artwork == self.artworks[0] or artwork == 1: # The Ugly Duchess
-                self.pushToQueue(self.artImages[0], (self.speakingTimeEst(self.artInfo[0]) + DURATION))
-                self.SpeakText(self.artInfo[0].lower())
-        elif artwork == self.artworks[1] or artwork == 2: # Composition of Red Yellow and Blue
-                self.pushToQueue(self.artImages[1], (self.speakingTimeEst(self.artInfo[1]) + DURATION))
-                self.SpeakText(self.artInfo[1].lower())
-        elif artwork == self.artworks[2] or artwork == 3: # Scene from Moby Dick
-                self.pushToQueue(self.artImages[2], (self.speakingTimeEst(self.artInfo[2]) + DURATION))
-                self.SpeakText(self.artInfo[2].lower())
-        elif artwork == self.artworks[3] or artwork == 4: # Flowers in Four Seasons
-                self.pushToQueue(self.artImages[3], (self.speakingTimeEst(self.artInfo[3]) + DURATION))
-                self.SpeakText(self.artInfo[3].lower())
-        elif artwork == self.artworks[4] or artwork == 5: # The Persistence of Memory
-                self.pushToQueue(self.artImages[4], (self.speakingTimeEst(self.artInfo[4]) + DURATION))
-                self.SpeakText(self.artInfo[4].lower())
-        # else:
-        #     self.SpeakText("what image would you like to know about")
-
-
+        idx = 0
+        idx = int(idx)
+        for name, location in self.artworks.items():
+            print(f"index: {idx}, name: {name}, location x: {location[0]}")
+            if name == artwork:
+                # self.publisher_location.publish(self.establishLocations(float(location[0]), float(location[1]), float(location[2])))
+                self.pushToQueue(self.artImages[name],(self.speakingTimeEst(self.artInfo[idx]) + DURATION))
+                self.SpeakText(self.artInfo[idx].lower)
+                break
+            idx += 1
 
     def tableStatus(self):
         print("Table Status Command Registered")
@@ -311,12 +313,6 @@ class Commands:
         tableLocation = self.tables.findTableLocation(table)
         self.SpeakText(f"follow me to table {str(table)}")
         print(f"Go To Table Command Recognised, Table Location is: {tableLocation}")
-        # goal = PoseStamped()
-        # goal.header.frame_id = "map"
-        # goal.header.stamp = self.node.get_clock().now().to_msg() 
-        # goal.pose.position.x = tableLocation[0]
-        # goal.pose.position.y = tableLocation[1]
-        # goal.pose.orientation.w = 1.0
         self.publisher_location.publish(self.establishLocations(tableLocation[0], tableLocation[1]))
 
 
@@ -328,7 +324,17 @@ class Commands:
         # self.fullScreenImage(self.factImages[factNum],(self.speakingTimeEst(self.facts[factNum]) + DURATION))
 
         self.SpeakText(self.facts[factNum], wait_for_image=True)
+    
+    def triggerGreet(self):
+        print("Greeting Guests Command Recognised")
+        self.SpeakText("going to door to greet guests")
+        self.publisher_location.publish(self.establishLocations(GREETLOCATION[0], GREETLOCATION[1]))
         
+    def triggerCharge(self):
+        print("Charging Command Recognised")
+        self.pushToQueue(self.chargeFace,DURATION)
+        self.SpeakText("returning to charging port")
+        self.publisher_location.publish(self.establishLocations(CHARGINGLOCATION[0], CHARGINGLOCATION[1]))
         
 
 

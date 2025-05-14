@@ -23,6 +23,18 @@ odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
     "/odom", 10,
     std::bind(&ObstacleAvoidance::odomCallback, this, std::placeholders::_1));
 
+    static_grid_client_ = this->create_client<std_srvs::srv::Trigger>("/request_static_grid");
+
+    request_timer_ = this->create_wall_timer(
+    std::chrono::seconds(2),
+    [this]()
+    {
+        this->requestStaticGridOnce();
+        this->request_timer_->cancel();  // one-shot
+    });
+
+
+
 
 }
 
@@ -45,6 +57,37 @@ void ObstacleAvoidance::staticObstaclesCallback(const geometry_msgs::msg::PoseAr
 
     RCLCPP_INFO(this->get_logger(), "Updated static obstacle list: %zu entries", known_static_obstacles_.size());
 }
+
+void ObstacleAvoidance::requestStaticGridOnce()
+{
+    // Wait for service to be available
+    if (!static_grid_client_->wait_for_service(std::chrono::seconds(2)))
+    {
+        RCLCPP_WARN(this->get_logger(), "⚠️ Service /request_static_grid not available.");
+        return;
+    }
+
+    auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+
+    // Send the request asynchronously and bind a callback
+    static_grid_client_->async_send_request(
+        request,
+        [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture result)
+        {
+            auto response = result.get();
+            if (response->success)
+            {
+                RCLCPP_INFO(this->get_logger(), "✅ Static grid requested: %s", response->message.c_str());
+            }
+            else
+            {
+                RCLCPP_WARN(this->get_logger(), "❌ Static grid service failed: %s", response->message.c_str());
+            }
+        });
+}
+
+
+
 
 void ObstacleAvoidance::staticMapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
 {
@@ -284,7 +327,7 @@ void ObstacleAvoidance::publishUnknownObstacles()
     }
 
     if (has_segment) {
-        unknown_grid_pub_->publish(grid);
+        // unknown_grid_pub_->publish(grid); //commented out to disable publishing grid for testing
         // RCLCPP_INFO(this->get_logger(), "✅ Published segment-based unknown obstacle map.");
     }
 }

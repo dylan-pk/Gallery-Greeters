@@ -16,6 +16,7 @@
 #include <thread>
 #include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 
 
 /**
@@ -35,6 +36,8 @@ private:
     void path_callback(const nav_msgs::msg::Path::SharedPtr path);
     void move();
 
+    void goal_callback(const geometry_msgs::msg::PoseStamped msg);
+
     void mode_callback(const std_msgs::msg::Int32::SharedPtr msg);
     void interrupt_callback(const std_msgs::msg::Bool::SharedPtr msg);
 
@@ -45,9 +48,15 @@ private:
     void dancey_dance();
     void turn_and_look_for_art();
 
+    double getYaw(const geometry_msgs::msg::Quaternion &q);
+
+double normalizeAngle(double angle);
+
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr reached_artwork_pub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_table_marker;
     rclcpp::TimerBase::SharedPtr timer_;
 
@@ -100,6 +109,9 @@ private:
 
     bool first_goal_ = true;
 
+    //going to goal member variables
+    bool going_to_artwork_ = false;
+
     void replaceGoalsNearUnknownObstacles(int num_goals_to_check, double danger_radius);
 
     // PID parameters
@@ -114,6 +126,14 @@ double sum_angular_error = 0.0;
 
 rclcpp::Time last_time;
 
+rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr client_; //dylans client to call the match artwork
+bool service_call_pending_ = false; //used to slow down template match requests
+
+
+geometry_msgs::msg::Quaternion final_goal_orientation_;
+bool correcting_final_orientation_ = false;
+bool final_pose_reached_ = false;
+bool has_final_orientation_ = false;
 
 
 

@@ -93,10 +93,10 @@ class TemplateMatchingNode(Node):
             response.message = f"Matched: {label} (Confidence: {confidence:.2f})"
 
             # Publiush interrupt signal
-            interrupt_msg = Bool()
-            interrupt_msg.data = True
-            self.interrupt_pub.publish(interrupt_msg)
-            self.get_logger().warn(f"📢 Interrupt signal published due to match: {label}")
+            # interrupt_msg = Bool()
+            # interrupt_msg.data = True
+            # self.interrupt_pub.publish(interrupt_msg)
+            # self.get_logger().warn(f"📢 Interrupt signal published due to match: {label}")
         else:
             response.success = False
             response.message = "No matching object found."

@@ -19,13 +19,18 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+
+
+
+
 
 # Add executable
 add_executable(nav_to_goal src/nav_to_goal.cpp)
 add_executable(nav_to_goal2 src/nav_to_goal2.cpp)
 add_executable(path_to_goal src/path_to_goal.cpp)
 add_executable(path_to_goal2 src/path_to_goal2.cpp)
-add_executable(path_to_goal3 src/path_to_goal3.cpp)
 add_executable(path_to_goal4 src/path_to_goal4.cpp)
 add_executable(path_subscriber src/path_subscriber.cpp)
 add_executable(goal_publisher src/goal_publisher.cpp)
@@ -73,12 +78,6 @@ ament_target_dependencies(path_to_goal2
   tf2_ros
   tf2_geometry_msgs
 )
-ament_target_dependencies(path_to_goal3
-  rclcpp
-  geometry_msgs
-  nav_msgs
-)
-
 ament_target_dependencies(path_to_goal4
   rclcpp
   geometry_msgs
@@ -87,8 +86,8 @@ ament_target_dependencies(path_to_goal4
   tf2_ros
   tf2_geometry_msgs
   sensor_msgs
+  std_srvs
 )
-
 target_link_libraries(path_to_goal4
   yaml-cpp
   ${OpenCV_LIBS}
@@ -112,7 +111,6 @@ install(TARGETS
   nav_to_goal2
   path_to_goal
   path_to_goal2
-  path_to_goal3
   path_to_goal4
   path_subscriber
   goal_publisher 

@@ -11,6 +11,9 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 
+// swithching to service as static grid isnt always sending
+#include "std_srvs/srv/trigger.hpp"
+
 class ObstacleAvoidance : public rclcpp::Node
 {
 public:
@@ -47,6 +50,13 @@ private:
 nav_msgs::msg::Odometry current_odom_;
 
 void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
+
+//for reuesting occupancy grid from pathtogoal4 service
+rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr static_grid_client_;
+void requestStaticGridOnce();
+rclcpp::TimerBase::SharedPtr request_timer_;
+
+
 
 };
 

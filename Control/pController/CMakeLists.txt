@@ -12,7 +12,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(angles REQUIRED)
 find_package(tf2_msgs REQUIRED)
-
+find_package(std_srvs REQUIRED)
 
 
 add_executable(p_controller src/p_controller.cpp src/obstacle_avoidance.cpp)
@@ -21,11 +21,11 @@ add_executable(test_path_publisher src/test_path_publisher.cpp)
 
 add_library(obstacle_avoidance src/obstacle_avoidance.cpp)
 
-ament_target_dependencies(p_controller rclcpp visualization_msgs geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros tf2_geometry_msgs angles tf2_msgs)
+ament_target_dependencies(p_controller rclcpp visualization_msgs geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros tf2_geometry_msgs angles tf2_msgs std_srvs)
 
 ament_target_dependencies(test_path_publisher rclcpp nav_msgs geometry_msgs tf2)
 
-ament_target_dependencies(obstacle_avoidance rclcpp geometry_msgs sensor_msgs nav_msgs tf2 tf2_ros tf2_geometry_msgs tf2_msgs)
+ament_target_dependencies(obstacle_avoidance rclcpp geometry_msgs sensor_msgs nav_msgs tf2 tf2_ros tf2_geometry_msgs tf2_msgs std_srvs)
 
 target_link_libraries(p_controller obstacle_avoidance)
 

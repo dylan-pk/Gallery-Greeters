@@ -18,6 +18,13 @@ pController::pController(ObstacleAvoidance &obstacleavoidance) : Node("p_control
     interrupt_sub_ = this->create_subscription<std_msgs::msg::Bool>(
         "/interrupt_signal", 10, std::bind(&pController::interrupt_callback, this, std::placeholders::_1));
 
+    goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+            "/pose_topic", 10, std::bind(&pController::goal_callback, this, std::placeholders::_1));
+
+    reached_artwork_pub_ = this->create_publisher<std_msgs::msg::Bool>("/reaches", 10);
+
+    client_ = this->create_client<std_srvs::srv::SetBool>("/perform_template_matching");
+
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(100),
         std::bind(&pController::move, this));
@@ -30,14 +37,28 @@ void pController::interrupt_callback(const std_msgs::msg::Bool::SharedPtr msg)
     interrupted_ = msg->data;
 }
 
+void pController::goal_callback(const geometry_msgs::msg::PoseStamped msg)
+{
+    final_goal_orientation_ = msg.pose.orientation;
+    has_final_orientation_ = true;
+}
+
 void pController::mode_callback(const std_msgs::msg::Int32::SharedPtr msg)
 {
     received_int_ = msg->data;
     RCLCPP_INFO(this->get_logger(), "Received control mode: %d", received_int_);
 
-    if (received_int_ == 1)
+    if (received_int_ == 0)
     {
         // sentry_mode_ = true;
+        going_to_artwork_ = true;
+        RCLCPP_INFO(this->get_logger(), "Going to Artwork");
+    }
+
+    else if (received_int_ == 1)
+    {
+        sentry_mode_ = true;
+        interrupted_ = false;
         RCLCPP_INFO(this->get_logger(), "Sentry Mode Activated");
     }
 
@@ -85,18 +106,91 @@ void pController::move()
     if (path_.poses.empty())
         return;
 
-    // === 2. Stop and reset if all waypoints are complete ===
-    if (path_index_ >= path_.poses.size() && !sentry_mode_)
+if (path_index_ >= path_.poses.size() && !sentry_mode_)
+{
+    if (!has_final_orientation_)
+    {
+        RCLCPP_WARN(this->get_logger(), "⚠️ No final orientation received yet. Cannot rotate.");
+        return;
+    }
+
+    double final_dist = getDistanceError(path_.poses.back());  // position
+    double yaw_now = getYaw(odo_.pose.pose.orientation);
+    double yaw_goal = getYaw(final_goal_orientation_);
+    double yaw_error = normalizeAngle(yaw_goal - yaw_now);
+
+    if (!final_pose_reached_)
+    {
+        if (final_dist < tolerance)
+        {
+            final_pose_reached_ = true;
+            RCLCPP_INFO(this->get_logger(), "📍 Final position reached.");
+        }
+        else
+        {
+            return;  // Still moving
+        }
+    }
+
+    // Final rotation logic
+    if (std::abs(yaw_error) > 0.1)
+    {
+        correcting_final_orientation_ = true;
+
+        geometry_msgs::msg::Twist rotate_msg;
+        rotate_msg.angular.z = Kp_angular * yaw_error;
+
+        if (std::abs(rotate_msg.angular.z) < 0.1)
+            rotate_msg.angular.z = 0.1 * (rotate_msg.angular.z > 0 ? 1 : -1);
+
+        cmd_vel_pub_->publish(rotate_msg);
+        return;
+    }
+    else if (correcting_final_orientation_)
+    {
+        RCLCPP_INFO(this->get_logger(), "✅ Final orientation corrected.");
+        correcting_final_orientation_ = false;
+
+        // Don't return here! Let the function continue to reach the publisher
+    }
+
+    // Final stop and publish
+    RCLCPP_INFO(this->get_logger(), "🎯 All goals complete.");
+    geometry_msgs::msg::Twist stop_msg;
+    cmd_vel_pub_->publish(stop_msg);
+
+    path_index_ = 0;
+    path_.poses.clear();
+    final_pose_reached_ = false;
+    has_final_orientation_ = false;
+
+    if (going_to_artwork_) 
+    {
+        std_msgs::msg::Bool msg;
+        msg.data = true;
+        RCLCPP_INFO(this->get_logger(), "📢 Publishing reached_artwork");
+        reached_artwork_pub_->publish(msg);
+        going_to_artwork_ = false;
+    }
+
+    return;
+}
+
+
+
+
+
+    if (sentry_mode_ && interrupted_)
     {
 
-        RCLCPP_INFO(this->get_logger(), "All waypoints reached.");
-        RCLCPP_INFO(this->get_logger(), "Goals inside obstacles: %d", goals_in_obstacles_);
+        RCLCPP_INFO(this->get_logger(), "Interrupted");
 
         geometry_msgs::msg::Twist stop_msg;
         cmd_vel_pub_->publish(stop_msg);
 
         path_index_ = 0;
         path_.poses.clear();
+        sentry_mode_ = false;
         return;
     }
 
@@ -254,7 +348,7 @@ void pController::turn_and_look_for_art()
     // "Rotated so far: %.2f rad | yaw_now: %.2f",
     // yaw_accumulated_, yaw_now);
 
-    if (yaw_accumulated_ >= 2 * M_PI || interrupted_)
+    if (yaw_accumulated_ >= 2 * M_PI)
     {
         geometry_msgs::msg::Twist stop;
         cmd_vel_pub_->publish(stop);
@@ -262,9 +356,41 @@ void pController::turn_and_look_for_art()
         rotating_ = false;
         yaw_accumulated_ = 0.0;
         first_rotation_step_ = true;
-        RCLCPP_INFO(this->get_logger(), "Rotation complete or interrupted.");
+        RCLCPP_INFO(this->get_logger(), "Rotation complete.");
         return;
     }
+
+    if (service_call_pending_)
+        return;
+
+    service_call_pending_ = true;
+
+    auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
+    request->data = true;
+
+    auto future = client_->async_send_request(request,
+                                              [this](rclcpp::Client<std_srvs::srv::SetBool>::SharedFuture result)
+                                              {
+                                                  service_call_pending_ = false;
+                                                  if (result.get()->success)
+                                                  {
+                                                      RCLCPP_INFO(this->get_logger(), "Service responded: SUCCESS - %s", result.get()->message.c_str());
+                                                      geometry_msgs::msg::Twist stop;
+                                                      cmd_vel_pub_->publish(stop);
+                                                      rotate_timer_->cancel();
+                                                      rotating_ = false;
+                                                      yaw_accumulated_ = 0.0;
+                                                      first_rotation_step_ = true;
+                                                      RCLCPP_INFO(this->get_logger(), "Artwork matched.");
+                                                      std_msgs::msg::Bool msg;
+                                                      msg.data = true;
+                                                      reached_artwork_pub_->publish(msg);
+                                                  }
+                                                  else
+                                                  {
+                                                      RCLCPP_WARN(this->get_logger(), "Service responded: FAILURE - %s", result.get()->message.c_str());
+                                                  }
+                                              });
 
     // Keep turning
     geometry_msgs::msg::Twist twist;
@@ -342,6 +468,24 @@ nav_msgs::msg::Odometry pController::getOdometry(void)
     nav_msgs::msg::Odometry pose = odo_;
     return pose;
 }
+
+double pController::getYaw(const geometry_msgs::msg::Quaternion &q)
+{
+    tf2::Quaternion tf_q(q.x, q.y, q.z, q.w);
+    double roll, pitch, yaw;
+    tf2::Matrix3x3(tf_q).getRPY(roll, pitch, yaw);
+    return yaw;
+}
+
+double pController::normalizeAngle(double angle)
+{
+    while (angle > M_PI)
+        angle -= 2.0 * M_PI;
+    while (angle < -M_PI)
+        angle += 2.0 * M_PI;
+    return angle;
+}
+
 
 int main(int argc, char *argv[])
 {
