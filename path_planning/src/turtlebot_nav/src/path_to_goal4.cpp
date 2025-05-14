@@ -801,6 +801,15 @@ private:
         {
             mark_path(marked_grid, path, cv::Vec3b(0, 255, 0)); // Green
         }
+        
+        // Display the image in a window 
+        cv::namedWindow("Path Visualization", cv::WINDOW_NORMAL); // Create a resizable window 
+        // cv::resizeWindow("Path Visualization", 800, 600); // Set the window size to 800x600 pixels 
+        int height = static_cast<int>(800 * (6.0 / 8));
+        int width = static_cast<int>(600 * (6.0 / 8));
+        cv::resizeWindow("Path Visualization", height, width);  
+        cv::imshow("Path Visualization", marked_grid); 
+        cv::waitKey(1); // Non-blocking, allows the program to continue 
 
         cv::imwrite("debug_grid_with_positions.png", marked_grid);
 
