@@ -1,0 +1,13 @@
+Webcam launch 
+	
+	ros2 launch template_match template_match_test.launch.py
+
+TurtleBot Launch
+	
+	ros2 launch template_match template_match_test.launch.py image_topic:=/image_raw
+
+Mulit-robot namespace
+
+	ros2 launch template_match template_match_test.launch.py image_topic:=/tb3_0/image_raw namespace:=tb3_0
+
+

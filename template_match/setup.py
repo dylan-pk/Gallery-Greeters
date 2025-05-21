@@ -7,17 +7,14 @@ package_name = 'template_match'
 setup(
     name=package_name,
     version='0.0.1',
-    packages=[package_name],
+    packages=[package_name],  # the subdirectory that contains __init__.py + template_match.py
     data_files=[
-        # Required for ROS 2 package discovery via ament_index
-        #(f'share/ament_index/resource_index/packages', [f'resource/{package_name}']),
-        
-        # Required to install your package metadata
         (f'share/{package_name}', ['package.xml']),
-
-        # Include everything inside the 'resource' folder (like template.jpg)
         (f'share/{package_name}/resource', glob('resource/*')),
+        (f'share/{package_name}/launch', glob('launch/*.launch.py')),
+        (f'share/{package_name}/camera_info', glob('camera_info/*')),
     ],
+    
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='dylan',
@@ -27,6 +24,8 @@ setup(
     entry_points={
         'console_scripts': [
             'template_match = template_match.template_match:main',
+            'camera_node = template_match.simple_cam_node:main',
         ],
     },
+
 )
