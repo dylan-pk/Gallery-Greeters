@@ -45,8 +45,11 @@ class Commands:
 
         ## ROS Topics and stuff
         self.subscriber_currentPos = node.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        self.currentPos = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+        self.waiter_pub = node.create_publisher(PoseStamped, '/waiter_tableloc', 10)
+        # self.drinks_pub = node.creat_publisher(DrinksOrder, '/drink_orders', 10)
 
-        # self.publisher_drinkOrders
+        # publishers to talk to other subsystems
         self.publisher_movementMode = node.mode_pub
         self.publisher_location = node.goal_pub
         self.publisher_path = node.publisher_path
@@ -228,11 +231,6 @@ class Commands:
         ros_msg = Int32()
         ros_msg.data = mode
         match mode:
-            # case 0: # Greet Guests
-            #     self.publisher_movementMode.publish(ros_msg)
-            #     print("Greeting Guests Command Recognised")
-            #     self.SpeakText("going to door to greet guests")
-            #     self.publisher_location.publish(self.establishLocations(GREETLOCATION[0], GREETLOCATION[1]))
             case 0: # Go to Artwork
                 self.publisher_movementMode.publish(ros_msg)
                 print("Entered Artwork Mode")
@@ -252,17 +250,6 @@ class Commands:
             case 3: # Spin around for Artwork
                 self.publisher_movementMode.publish(ros_msg)
                 print("Spinning activated")
-            
-            # case 3: # Go to Charging Port
-            #     self.publisher_movementMode.publish(ros_msg)
-            #     print("Charging Command Recognised")
-            #     self.pushToQueue(self.chargeFace,DURATION)
-            #     self.SpeakText("returning to charging port")
-            #     self.publisher_location.publish(self.establishLocations(CHARGINGLOCATION[0], CHARGINGLOCATION[1]))
-            # case 4: #go to table
-            #     self.publisher_movementMode.publish(ros_msg)
-            #     self.pushToQueue(self.chargeFace,DURATION)
-            #     self.SpeakText("Going to table")
 
     def sentryMode(self):
         path_msg = Path()
@@ -279,6 +266,7 @@ class Commands:
     def sendDrinkOrder(self, drinks, table):
         for i in range(3):
             print("Ordering " + str(drinks[i][1]) + " " + str(drinks[i][0]) + "s")
+        # self.drinks_pub.publish(drinks)
 
     def publishArtLocation(self, artwork):
         print(f"publishing location: [{self.artworks[artwork][0]}, {self.artworks[artwork][1]}, {self.artworks[artwork][2]}]")
@@ -303,11 +291,16 @@ class Commands:
         statusImage = self.tables.generateTableStatusImage(self.screenWidth, self.screenHeight)
         self.pushToQueue(statusImage, DURATION)
 
-    def callWaiter(self, location):
-        table = self.tables.getClosestTable(location)
+    def callWaiter(self):
+        roboLocation = self.currentPos[1]
+        print(roboLocation)
+        table = self.tables.getClosestTable(roboLocation)
+        # table = 2
         print(f"Call Waiter Command Recognised, calling to table {table}")
         self.pushToQueue(self.callingFace, DURATION)
-        self.SpeakText("calling a waiter here")
+        self.SpeakText(f"calling a waiter to table {table}")
+        tableLocation = self.tables.findTableLocation(table)
+        self.waiter_pub.publish(self.establishLocations(tableLocation[0], tableLocation[1]))
 
     def goToTable(self, table):
         tableLocation = self.tables.findTableLocation(table)

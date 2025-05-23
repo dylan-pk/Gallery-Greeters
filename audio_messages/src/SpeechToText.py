@@ -25,8 +25,9 @@ from nav_msgs.msg import Path
 audio_to_main_queue = queue.Queue()
 main_to_gui_queue = queue.Queue()
 
-TESTING_MODE = True
-ACCESS_KEY = "UNuftCmjek2mefFH8OZiwT0LiaeSZJBcFdo1GaqCGcEiKTGQfR7vYQ=="# "8HEM095Qo29k5b/OQ01LPFlr+FfiUHVRi0k1N1rYnUQ2ZvZuig2zdA==" # -Anika
+TESTING_MODE = False
+# ACCESS_KEY = "UNuftCmjek2mefFH8OZiwT0LiaeSZJBcFdo1GaqCGcEiKTGQfR7vYQ=="# - Andrew
+ACCESS_KEY = "8HEM095Qo29k5b/OQ01LPFlr+FfiUHVRi0k1N1rYnUQ2ZvZuig2zdA==" # -Anika
 READY_FOR_COMMAND = False
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
@@ -98,34 +99,36 @@ class SpeechToText(Node):
                 match word:
                     case "greeting":
                         self.listening_event.clear()
-                        self.comms.modeChange(0) # Waiting for how to send data
+                        self.comms.triggerGreet()
                     case "drink":
                         self.listening_event.clear()
                         self.comms.pushToQueue(self.availabledrinks, 0, True)
                         self.getDrinkOrder()
+                    case "artwork":
+                        self.listening_event.clear()
+                        self.artWorkInfo()
                     case "art":
                         self.listening_event.clear()
                         self.artWorkInfo()
-                        # self.comms.artWorkInfo() # COMMAND CODE DONE
                     case "walk":
                         self.listening_event.clear()
-                        self.comms.modeChange(1) # Waiting for how to send data
+                        self.comms.modeChange(1)
                     case "charge":
                         self.listening_event.clear()
-                        self.comms.modeChange(3) # Face Change / Waiting for how to send data
+                        self.comms.triggerCharge()
                     case "table":
                         self.listening_event.clear()
                         self.tableCommands(words)
                     case "waiter":
                         self.listening_event.clear()
-                        currentPosition = [0,0,0] # Get currentPosition value and pass it in
-                        self.comms.callWaiter(currentPosition) # Face Change / Waiting for how to send data
+                        # currentPosition = [0,0,0] # Get currentPosition value and pass it in
+                        self.comms.callWaiter()#currentPosition)
                     case "fact":
                         self.listening_event.clear()
-                        self.comms.funFact() # COMMAND CODE DONE
+                        self.comms.funFact()
                     case "dance":
                         self.listening_event.clear()
-                        self.comms.modeChange(2) # Waiting for how to send data
+                        self.comms.modeChange(2)
                     case _:
                         # print("Not a command word")
                         pass
@@ -273,31 +276,37 @@ class SpeechToText(Node):
         return number
        
     def artWorkInfo(self):
-        # self.comms.SpeakText("which artwork would you like to know about")
-        print("1: duchess\n2: squares\n3: boat\n4: seasons\n"
-            "5: clock\n6: skull\n7: scream\n8: poker\n9: lisa\n10: funky")
-        artwork_idx = int(input("Which Artwork: "))
-        artwork_names = list(self.comms.getArtworkNames().keys())
-        artwork = artwork_names[artwork_idx - 1]
-        # artwork = "the clock" # self.audioRecording(self.deviceNum, "Art Request", 1)
-        actualArt = False
-        for word in artwork.split():
-            for art in self.comms.getArtworkNames():
-                print(f"word is {word}, artwork is {art}")
-                if word == art:
-                    print("matched")
-                    requestedArtwork = word
-                    actualArt = True
-                
-        if actualArt:
-            # go to the artwork then scan
-            self.comms.modeChange(0)
-            self.comms.publishArtLocation(requestedArtwork)
-            pass
-        else:
-            # spin in a circle till you see artwork
-            self.comms.modeChange(3)
-            pass
+        print("Into the Artwork Prompt")
+        while True:
+            self.comms.SpeakText("which artwork would you like to know about")
+            if TESTING_MODE:
+                print("1: duchess\n2: squares\n3: boat\n4: seasons\n"
+                    "5: clock\n6: skull\n7: scream\n8: poker\n9: lisa\n10: funky")
+                artwork_idx = int(input("Which Artwork: "))
+                artwork_names = list(self.comms.getArtworkNames().keys())
+                artwork = artwork_names[artwork_idx - 1]
+            else:
+                artwork = self.audioRecording(self.deviceNum, "Art Request", 1)
+            actualArt = False
+            for word in artwork.split():
+                for art in self.comms.getArtworkNames():
+                    print(f"word is {word}, artwork is {art}")
+                    if word == art:
+                        print("matched")
+                        requestedArtwork = word
+                        actualArt = True
+                        break
+                    
+            if actualArt:
+                # go to the artwork then scan
+                break
+            else:
+                # spin in a circle till you see artwork
+                # self.comms.modeChange(3)
+                self.comms.SpeakText("sorry I did not get that")
+        
+        self.comms.modeChange(0)
+        self.comms.publishArtLocation(requestedArtwork)
         
         # wait for subscriber to say it's found the artwork
         print("Waiting for scan trigger...")

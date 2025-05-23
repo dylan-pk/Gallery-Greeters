@@ -52,7 +52,7 @@ def generate_launch_description():
 
     # Step 3: Launch other nodes after Nav2 (~5s delay)
     p_controller_launch = TimerAction(
-        period=10.0,
+        period=40.0,
         actions=[
             ExecuteProcess(
                 cmd=['ros2', 'run', 'p_controller', 'p_controller'],
@@ -62,7 +62,7 @@ def generate_launch_description():
     )
 
     path_planner_launch = TimerAction(
-        period=10.5,
+        period=45.5,
         actions=[
             ExecuteProcess(
                 cmd=['ros2', 'run', 'turtlebot_nav', 'path_to_goal4'],
@@ -72,7 +72,7 @@ def generate_launch_description():
     )
 
     template_match_launch = TimerAction(
-        period=11.0,
+        period=10.0,
         actions=[
             ExecuteProcess(
                 cmd=['ros2', 'run', 'template_match', 'template_match'],
