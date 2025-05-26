@@ -13,7 +13,6 @@ class SmartCamNode(Node):
 
         self.cap = self.find_working_camera()
         if not self.cap or not self.cap.isOpened():
-            self.get_logger().error("❌ No working camera found.")
             return
 
         self.get_logger().info("✅ Camera opened successfully.")
