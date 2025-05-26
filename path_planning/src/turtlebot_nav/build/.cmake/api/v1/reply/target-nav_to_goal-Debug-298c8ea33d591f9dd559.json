@@ -2,7 +2,7 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "nav_to_goal2"
+			"path" : "nav_to_goal"
 		}
 	],
 	"backtrace" : 1,
@@ -30,19 +30,19 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 31,
+				"line" : 30,
 				"parent" : 0
 			},
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 109,
+				"line" : 128,
 				"parent" : 0
 			},
 			{
 				"command" : 3,
 				"file" : 0,
-				"line" : 49,
+				"line" : 40,
 				"parent" : 0
 			},
 			{
@@ -302,7 +302,7 @@
 			]
 		}
 	],
-	"id" : "nav_to_goal2::@6890427a1f51a3e7e1df",
+	"id" : "nav_to_goal::@6890427a1f51a3e7e1df",
 	"install" : 
 	{
 		"destinations" : 
@@ -837,8 +837,8 @@
 		],
 		"language" : "CXX"
 	},
-	"name" : "nav_to_goal2",
-	"nameOnDisk" : "nav_to_goal2",
+	"name" : "nav_to_goal",
+	"nameOnDisk" : "nav_to_goal",
 	"paths" : 
 	{
 		"build" : ".",
@@ -859,7 +859,7 @@
 		{
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,
-			"path" : "src/nav_to_goal2.cpp",
+			"path" : "src/nav_to_goal.cpp",
 			"sourceGroupIndex" : 0
 		}
 	],
