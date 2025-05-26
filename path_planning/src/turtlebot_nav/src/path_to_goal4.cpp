@@ -79,9 +79,10 @@ public:
         goal_subscriber_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             "/pose_topic", 10, std::bind(&PathToGoalClient::pose_callback, this, _1));
         odometry_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "odom", 10, std::bind(&PathToGoalClient::odometry_callback, this, _1));
+            "/odom", 10, std::bind(&PathToGoalClient::odometry_callback, this, _1));
 
-        map_meta_ = load_map_yaml("gallery_map.yaml");
+        map_meta_ = load_map_yaml("real_map2.yaml");
+        // map_meta_ = load_map_yaml("gallery_map.yaml");
         // int inflation_radius = 4;//2.75;
 
         float inflation_radius_m = 0.15; // meters
@@ -273,8 +274,15 @@ private:
 
         // Use the latest odometry pose as the initial estimate
         msg.pose.pose = current_pose_;
-        msg.pose.pose.position.x = msg.pose.pose.position.x + 0.2;
-        msg.pose.pose.position.y = msg.pose.pose.position.y + 0.2;
+        msg.pose.pose.position.x = msg.pose.pose.position.x + 0.5;
+        msg.pose.pose.position.y = msg.pose.pose.position.y -1.2;
+
+        // msg.pose.pose.orientation.z = msg.pose.pose.orientation.z + 1.57; 
+
+                // Rotate -90 degrees to align with rotated map
+        tf2::Quaternion q;
+        q.setRPY(0, 0, M_PI_2+0.262);  // yaw in radians
+        msg.pose.pose.orientation = tf2::toMsg(q);
 
         // Optional: Adjust covariance (still needed)
         msg.pose.covariance[0] = 0.25;    // x variance
