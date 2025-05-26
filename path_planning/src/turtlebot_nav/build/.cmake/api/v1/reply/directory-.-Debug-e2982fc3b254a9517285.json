@@ -36,13 +36,13 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 109,
+				"line" : 128,
 				"parent" : 0
 			},
 			{
 				"command" : 5,
 				"file" : 0,
-				"line" : 128,
+				"line" : 148,
 				"parent" : 0
 			},
 			{
@@ -281,6 +281,18 @@
 			],
 			"targetId" : "path_to_goal4::@6890427a1f51a3e7e1df",
 			"targetIndex" : 6,
+			"type" : "target"
+		},
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "lib/turtlebot_nav",
+			"paths" : 
+			[
+				"path_to_goal5"
+			],
+			"targetId" : "path_to_goal5::@6890427a1f51a3e7e1df",
+			"targetIndex" : 7,
 			"type" : "target"
 		},
 		{

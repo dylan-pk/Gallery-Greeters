@@ -32,6 +32,7 @@ add_executable(nav_to_goal2 src/nav_to_goal2.cpp)
 add_executable(path_to_goal src/path_to_goal.cpp)
 add_executable(path_to_goal2 src/path_to_goal2.cpp)
 add_executable(path_to_goal4 src/path_to_goal4.cpp)
+add_executable(path_to_goal5 src/path_to_goal5.cpp) 
 add_executable(path_subscriber src/path_subscriber.cpp)
 add_executable(goal_publisher src/goal_publisher.cpp)
 
@@ -96,6 +97,24 @@ target_link_libraries(path_to_goal4
 target_include_directories(path_to_goal4 PRIVATE
   ${OpenCV_INCLUDE_DIRS}
 )
+ament_target_dependencies(path_to_goal5
+  rclcpp
+  geometry_msgs
+  nav_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  sensor_msgs
+  std_srvs
+)
+target_link_libraries(path_to_goal5
+  yaml-cpp
+  ${OpenCV_LIBS}
+)
+
+target_include_directories(path_to_goal5 PRIVATE
+  ${OpenCV_INCLUDE_DIRS}
+)
 ament_target_dependencies(path_subscriber
   rclcpp
   nav_msgs
@@ -112,6 +131,7 @@ install(TARGETS
   path_to_goal
   path_to_goal2
   path_to_goal4
+  path_to_goal5
   path_subscriber
   goal_publisher 
   DESTINATION lib/${PROJECT_NAME}
