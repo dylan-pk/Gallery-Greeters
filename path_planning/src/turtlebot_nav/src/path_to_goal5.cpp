@@ -1,4 +1,3 @@
-
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
@@ -923,6 +922,10 @@ void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
         RCLCPP_INFO(this->get_logger(), "Start grid: (%d, %d), Goal grid: (%d, %d)", start.x, start.y, goal.x, goal.y);
 
         std::vector<Point> path = a_star(start, goal);
+
+        // Smooth the path before publishing
+        auto smoothed_path = smooth_path(path, 3);
+
         last_computed_path_ = path;
 
         if (path.empty())
@@ -942,6 +945,11 @@ void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
             mark_path(marked_grid, path, cv::Vec3b(0, 255, 0)); // Green
         }
         
+        // if (!smoothed_path.empty())
+        // {
+        //     mark_path(marked_grid, smoothed_path, cv::Vec3b(0, 255, 0)); // Green
+        // }
+
         // Display the image in a window 
         cv::namedWindow("Path Visualization", cv::WINDOW_NORMAL); // Create a resizable window 
         // cv::resizeWindow("Path Visualization", 800, 600); // Set the window size to 800x600 pixels 
@@ -952,6 +960,11 @@ void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
         cv::waitKey(1); // Non-blocking, allows the program to continue 
 
         cv::imwrite("debug_grid_with_positions.png", marked_grid);
+
+        // if (!smoothed_path.empty())
+        // {
+        //     publish_path(smoothed_path);
+        // }
 
         if (!path.empty())
         {
@@ -1233,6 +1246,25 @@ void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
 
 
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr obstacle_pub_;
+
+std::vector<Point> smooth_path(const std::vector<Point>& path, int window_size = 3) {
+    std::vector<Point> smoothed;
+    int n = path.size();
+    for (int i = 0; i < n; ++i) {
+        double sum_x = 0, sum_y = 0;
+        int count = 0;
+        for (int j = std::max(0, i - window_size); j <= std::min(n - 1, i + window_size); ++j) {
+            sum_x += path[j].x;
+            sum_y += path[j].y;
+            count++;
+        }
+        Point p = path[i];
+        p.x = static_cast<int>(sum_x / count);
+        p.y = static_cast<int>(sum_y / count);
+        smoothed.push_back(p);
+    }
+    return smoothed;
+}
 };
 
 int main(int argc, char **argv)

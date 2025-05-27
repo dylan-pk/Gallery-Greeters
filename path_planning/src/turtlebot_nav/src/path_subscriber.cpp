@@ -45,7 +45,7 @@ private:
         }
 
         cv::imshow("Path", img);
-        cv::waitKey(1);
+        cv::waitKey(0);
     }
 
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_subscription_;

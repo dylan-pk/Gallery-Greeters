@@ -1,5 +1,5 @@
 CMakeFiles/path_to_goal.dir/src/path_to_goal.cpp.o: \
- /home/lachlan/ros2_ws/src/turtlebot_nav/src/path_to_goal.cpp \
+ /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/src/path_to_goal.cpp \
  /usr/include/stdc-predef.h /usr/include/c++/11/memory \
  /usr/include/c++/11/bits/stl_algobase.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h \
