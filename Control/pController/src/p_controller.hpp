@@ -136,6 +136,9 @@ bool final_pose_reached_ = false;
 bool has_final_orientation_ = false;
 
 
+geometry_msgs::msg::Quaternion initial_orientation_;
+bool corrected_ = false;
+
 
 
 };

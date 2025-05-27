@@ -13,6 +13,9 @@ find_package(visualization_msgs REQUIRED)
 find_package(angles REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+
 
 
 add_executable(p_controller src/p_controller.cpp src/obstacle_avoidance.cpp)
@@ -28,6 +31,18 @@ ament_target_dependencies(test_path_publisher rclcpp nav_msgs geometry_msgs tf2)
 ament_target_dependencies(obstacle_avoidance rclcpp geometry_msgs sensor_msgs nav_msgs tf2 tf2_ros tf2_geometry_msgs tf2_msgs std_srvs)
 
 target_link_libraries(p_controller obstacle_avoidance)
+target_link_libraries(p_controller ${OpenCV_LIBS})
+target_link_libraries(obstacle_avoidance ${OpenCV_LIBS})
+
+target_link_libraries(obstacle_avoidance
+  yaml-cpp
+  ${OpenCV_LIBS}
+)
+
+target_include_directories(obstacle_avoidance PRIVATE
+  ${OpenCV_INCLUDE_DIRS}
+)
+
 
 install(TARGETS
   p_controller

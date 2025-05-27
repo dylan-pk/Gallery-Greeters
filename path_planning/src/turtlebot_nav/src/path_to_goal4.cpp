@@ -81,11 +81,11 @@ public:
         odometry_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/odom", 10, std::bind(&PathToGoalClient::odometry_callback, this, _1));
 
-        map_meta_ = load_map_yaml("real_map2.yaml");
+        map_meta_ = load_map_yaml("real_map4.yaml");
         // map_meta_ = load_map_yaml("gallery_map.yaml");
         // int inflation_radius = 4;//2.75;
 
-        float inflation_radius_m = 0.15; // meters
+        float inflation_radius_m = 0.2; // meters
         int inflation_radius = static_cast<int>(std::ceil(inflation_radius_m / map_meta_.resolution));
 
         // auto [inflated_grid, visualization_grid] = load_map_image(map_meta_.image_path, map_meta_, inflation_radius);
@@ -102,14 +102,26 @@ public:
         cv::imwrite("debug_grid_with_inflation.png", visualization_grid_);
         RCLCPP_INFO(this->get_logger(), "Saved occupancy grid with inflation to debug_grid_with_inflation.png");
 
-        obstacle_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/known_static_obstacles", 10);
+        // obstacle_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/known_static_obstacles", 10);
+        obstacle_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>(
+    "/known_static_obstacles", 
+    rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default))
+        .transient_local().reliable());
+
+        rclcpp::sleep_for(std::chrono::milliseconds(500));
         extract_static_obstacles();
+
 
         dynamic_grid_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
             "/updated_occupancy_grid", 10,
             std::bind(&PathToGoalClient::dynamic_grid_callback, this, _1));
 
-        static_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/static_occupancy_grid", 1);
+        // static_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/static_occupancy_grid", 1);
+static_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
+    "/static_occupancy_grid", 
+    rclcpp::QoS(1).transient_local().reliable());
+
+
         // occupancy_timer_ = this->create_wall_timer(
         //     std::chrono::seconds(3),
         //     std::bind(&PathToGoalClient::publish_static_grid, this));
@@ -143,6 +155,11 @@ public:
 
         interrupt_sub_ = this->create_subscription<std_msgs::msg::Bool>(
             "/interrupt_signal", 10, std::bind(&PathToGoalClient::interrupt_callback, this, std::placeholders::_1));
+
+        sentry_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(500),
+            std::bind(&PathToGoalClient::monitor_and_advance_sentry, this));
+
 
         live_path_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(500),
@@ -196,6 +213,15 @@ private:
     const int mismatch_threshold_ = 2;
 
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr static_grid_service_;
+
+        // Sentry mode loop state
+    std::vector<geometry_msgs::msg::PoseStamped> sentry_goals_;
+    int current_sentry_goal_idx_ = 0;
+    bool sentry_active_ = false;
+
+// Timer to monitor goal progress
+rclcpp::TimerBase::SharedPtr sentry_timer_;
+
 
     void handle_static_grid_request(
         const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
@@ -274,15 +300,14 @@ private:
 
         // Use the latest odometry pose as the initial estimate
         msg.pose.pose = current_pose_;
-        msg.pose.pose.position.x = msg.pose.pose.position.x + 0.5;
-        msg.pose.pose.position.y = msg.pose.pose.position.y -1.2;
 
-        // msg.pose.pose.orientation.z = msg.pose.pose.orientation.z + 1.57; 
+        // real turtlebot pose
+        msg.pose.pose.position.x = msg.pose.pose.position.x;
+        msg.pose.pose.position.y = msg.pose.pose.position.y;
 
-                // Rotate -90 degrees to align with rotated map
-        tf2::Quaternion q;
-        q.setRPY(0, 0, M_PI_2+0.262);  // yaw in radians
-        msg.pose.pose.orientation = tf2::toMsg(q);
+        //simmulation pose
+        // msg.pose.pose.position.x = msg.pose.pose.position.x + 0.2;
+        // msg.pose.pose.position.y = msg.pose.pose.position.y + 0.2;
 
         // Optional: Adjust covariance (still needed)
         msg.pose.covariance[0] = 0.25;    // x variance
@@ -422,118 +447,297 @@ private:
 
     rclcpp::TimerBase::SharedPtr live_path_timer_;
 
-    void update_live_path_display()
+    
+void update_live_path_display()
+{
+    if (raw_static_grid_.empty() || inflated_static_grid_.empty() || inflated_dynamic_grid_.empty())
     {
-        if (visualization_grid_.empty() || occupancy_grid_.empty() || inflated_dynamic_grid_.empty())
-        {
-            // RCLCPP_WARN(this->get_logger(), "❌ Skipping path display update: Grid not initialized.");
-            return;
-        }
-
-        cv::Mat path_view = visualization_grid_.clone();
-
-        if (path_view.channels() == 1)
-            cv::cvtColor(path_view, path_view, cv::COLOR_GRAY2BGR);
-
-        for (int y = 0; y < occupancy_grid_.rows; ++y)
-        {
-            for (int x = 0; x < occupancy_grid_.cols; ++x)
-            {
-                if (inflated_dynamic_grid_.at<uchar>(y, x) == 255)
-                    path_view.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255); // Red
-            }
-        }
-
-        for (const auto &pt : last_computed_path_)
-        {
-            if (pt.x >= 0 && pt.x < path_view.cols && pt.y >= 0 && pt.y < path_view.rows)
-                path_view.at<cv::Vec3b>(pt.y, pt.x) = cv::Vec3b(0, 255, 0); // Green
-        }
-
-        Point robot_pt = world_to_grid(current_pose_.position.x, current_pose_.position.y);
-        if (robot_pt.x >= 0 && robot_pt.x < path_view.cols && robot_pt.y >= 0 && robot_pt.y < path_view.rows)
-            path_view.at<cv::Vec3b>(robot_pt.y, robot_pt.x) = cv::Vec3b(255, 255, 255); // White
-
-        cv::imshow("Live Path View", path_view);
-        cv::waitKey(1);
+        return;
     }
 
-    void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
+    // Start from fresh raw static map
+    cv::Mat path_view;
+    cv::cvtColor(raw_static_grid_, path_view, cv::COLOR_GRAY2BGR);
+
+    // Add yellow overlay for static inflation
+    for (int y = 0; y < inflated_static_grid_.rows; ++y)
     {
-        if (msg->info.width != raw_static_grid_.cols || msg->info.height != raw_static_grid_.rows)
+        for (int x = 0; x < inflated_static_grid_.cols; ++x)
         {
-            // RCLCPP_WARN(this->get_logger(), "Mismatch in grid dimensions. Skipping dynamic update.");
-            return;
-        }
-
-        // Step 1: Convert to binary unknown obstacle mask
-        dynamic_overlay_grid_ = cv::Mat::zeros(raw_static_grid_.size(), CV_8UC1);
-        for (int y = 0; y < msg->info.height; ++y)
-        {
-            for (int x = 0; x < msg->info.width; ++x)
+            if (inflated_static_grid_.at<uchar>(y, x) == 255 &&
+                raw_static_grid_.at<uchar>(y, x) != 255)
             {
-                int idx = y * msg->info.width + x;
-                if (msg->data[idx] == 100)
-                    dynamic_overlay_grid_.at<uchar>(y, x) = 255;
+                path_view.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 255, 255); // Yellow
             }
-        }
-
-        // Step 2: Inflate dynamic obstacles
-        // int dynamic_inflation_radius = 3.5;  // adjustable
-
-        float dynamic_inflation_radius_m = 0.35; // meters
-        int dynamic_inflation_radius = static_cast<int>(std::ceil(dynamic_inflation_radius_m / map_meta_.resolution));
-        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-                                                   cv::Size(2 * dynamic_inflation_radius + 1, 2 * dynamic_inflation_radius + 1));
-        cv::dilate(dynamic_overlay_grid_, inflated_dynamic_grid_, kernel);
-
-        // Step 3: Merge with static inflated map
-        occupancy_grid_ = inflated_static_grid_.clone(); // start from static inflated
-        occupancy_grid_ |= inflated_dynamic_grid_;       // merge dynamic
-
-        // Optional: visual debug overlay
-        for (int y = 0; y < occupancy_grid_.rows; ++y)
-        {
-            for (int x = 0; x < occupancy_grid_.cols; ++x)
-            {
-                if (inflated_dynamic_grid_.at<uchar>(y, x) == 255)
-                    visualization_grid_.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255); // red for dynamic
-            }
-        }
-
-        // RCLCPP_INFO(this->get_logger(), "✅ Dynamic grid merged and inflated with radius %.2f", dynamic_inflation_radius);
-
-        if (!has_last_goal_)
-            return;
-
-        float dx = current_pose_.position.x - last_goal_.pose.position.x;
-        float dy = current_pose_.position.y - last_goal_.pose.position.y;
-        if (std::hypot(dx, dy) < 0.2)
-        {
-            RCLCPP_INFO(this->get_logger(), "Robot at goal, no replanning.");
-            table_mode_ = false;
-            return;
-        }
-
-        bool path_obstructed = false;
-        for (const auto &pt : last_computed_path_)
-        {
-            if (pt.x >= 0 && pt.x < occupancy_grid_.cols &&
-                pt.y >= 0 && pt.y < occupancy_grid_.rows &&
-                inflated_dynamic_grid_.at<uchar>(pt.y, pt.x) == 255)
-            {
-                path_obstructed = true;
-                break;
-            }
-        }
-
-        if (path_obstructed)
-        {
-            RCLCPP_WARN(this->get_logger(), "⚠️ Path obstructed by new dynamic obstacle. Replanning...");
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-            pose_callback(std::make_shared<geometry_msgs::msg::PoseStamped>(last_goal_));
         }
     }
+
+    // Add red overlay for dynamic obstacles
+    for (int y = 0; y < inflated_dynamic_grid_.rows; ++y)
+    {
+        for (int x = 0; x < inflated_dynamic_grid_.cols; ++x)
+        {
+            if (inflated_dynamic_grid_.at<uchar>(y, x) == 255)
+            {
+                path_view.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255); // Red
+            }
+        }
+    }
+
+    // Mark current robot position
+    Point robot_pt = world_to_grid(current_pose_.position.x, current_pose_.position.y);
+    if (robot_pt.x >= 0 && robot_pt.x < path_view.cols &&
+        robot_pt.y >= 0 && robot_pt.y < path_view.rows)
+    {
+        path_view.at<cv::Vec3b>(robot_pt.y, robot_pt.x) = cv::Vec3b(255, 255, 255); // White
+    }
+
+    // Draw planned path
+    for (const auto &pt : last_computed_path_)
+    {
+        if (pt.x >= 0 && pt.x < path_view.cols &&
+            pt.y >= 0 && pt.y < path_view.rows)
+        {
+            path_view.at<cv::Vec3b>(pt.y, pt.x) = cv::Vec3b(0, 255, 0); // Green
+        }
+    }
+
+    cv::namedWindow("Live Path View", cv::WINDOW_NORMAL);
+    int height = static_cast<int>(800 * (6.0 / 8));
+    int width = static_cast<int>(600 * (6.0 / 8));
+            cv::resizeWindow("Live Path View", height, width);  
+    cv::imshow("Live Path View", path_view);
+    cv::waitKey(1);
+}
+
+
+
+// void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
+// {
+//     if (msg->info.width != raw_static_grid_.cols || msg->info.height != raw_static_grid_.rows)
+//     {
+//         RCLCPP_WARN(this->get_logger(), "Mismatch in grid dimensions. Skipping dynamic update.");
+//         return;
+//     }
+
+//     // Step 1: Convert to binary unknown obstacle mask
+//     dynamic_overlay_grid_ = cv::Mat::zeros(raw_static_grid_.size(), CV_8UC1);
+//     for (int y = 0; y < msg->info.height; ++y)
+//     {
+//         for (int x = 0; x < msg->info.width; ++x)
+//         {
+//             int idx = y * msg->info.width + x;
+//             if (msg->data[idx] == 100)
+//                 dynamic_overlay_grid_.at<uchar>(y, x) = 255;
+//         }
+//     }
+
+//     // Step 2: Inflate dynamic obstacles
+//     float dynamic_inflation_radius_m = 0.35; // meters
+//     int dynamic_inflation_radius = static_cast<int>(std::ceil(dynamic_inflation_radius_m / map_meta_.resolution));
+//     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+//                                                cv::Size(2 * dynamic_inflation_radius + 1, 2 * dynamic_inflation_radius + 1));
+//     cv::dilate(dynamic_overlay_grid_, inflated_dynamic_grid_, kernel);
+
+//     // Step 3: Merge with static inflated map
+//     occupancy_grid_ = inflated_static_grid_.clone(); // start from static inflated
+//     occupancy_grid_ |= inflated_dynamic_grid_;       // merge dynamic
+
+//     if (!has_last_goal_)
+//         return;
+
+//     float dx = current_pose_.position.x - last_goal_.pose.position.x;
+//     float dy = current_pose_.position.y - last_goal_.pose.position.y;
+//     if (std::hypot(dx, dy) < 0.2)
+//     {
+//         RCLCPP_INFO(this->get_logger(), "Robot at goal, no replanning.");
+//         table_mode_ = false;
+//         return;
+//     }
+
+//     bool path_obstructed = false;
+//     for (const auto &pt : last_computed_path_)
+//     {
+//         if (pt.x >= 0 && pt.x < occupancy_grid_.cols &&
+//             pt.y >= 0 && pt.y < occupancy_grid_.rows &&
+//             inflated_dynamic_grid_.at<uchar>(pt.y, pt.x) == 255)
+//         {
+//             path_obstructed = true;
+//             break;
+//         }
+//     }
+
+//     if (path_obstructed)
+//     {
+//         RCLCPP_WARN(this->get_logger(), "⚠️ Path obstructed by new dynamic obstacle. Replanning...");
+//         std::this_thread::sleep_for(std::chrono::seconds(2));
+//         pose_callback(std::make_shared<geometry_msgs::msg::PoseStamped>(last_goal_));
+//     }
+// }
+
+// void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
+// {
+//     if (msg->info.width != raw_static_grid_.cols || msg->info.height != raw_static_grid_.rows)
+//     {
+//         RCLCPP_WARN(this->get_logger(), "❌ Mismatch in grid dimensions. Skipping dynamic update.");
+//         return;
+//     }
+
+//     // Step 1: Convert to binary unknown obstacle mask
+//     dynamic_overlay_grid_ = cv::Mat::zeros(raw_static_grid_.size(), CV_8UC1);
+//     int count = 0;
+//     for (int y = 0; y < msg->info.height; ++y)
+//     {
+//         for (int x = 0; x < msg->info.width; ++x)
+//         {
+//             int idx = y * msg->info.width + x;
+//             if (msg->data[idx] == 100)
+//             {
+//                 dynamic_overlay_grid_.at<uchar>(y, x) = 255;
+//                 count++;
+//             }
+//         }
+//     }
+
+//     RCLCPP_INFO(this->get_logger(), "📊 Detected %d unknown dynamic obstacle cells", count);
+
+//     // Step 2: Inflate dynamic obstacles with half the radius of static inflation
+//     float static_inflation_radius_m = 0.7;  // Adjust if needed
+//     float dynamic_inflation_radius_m = static_inflation_radius_m / 2.0;
+
+//     int dynamic_inflation_radius = static_cast<int>(std::ceil(dynamic_inflation_radius_m / map_meta_.resolution));
+//     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+//                                                cv::Size(2 * dynamic_inflation_radius + 1, 2 * dynamic_inflation_radius + 1));
+//     cv::dilate(dynamic_overlay_grid_, inflated_dynamic_grid_, kernel);
+
+//     // Optional: Show debug view
+//     cv::namedWindow("Inflated Dynamic Obstacles", cv::WINDOW_NORMAL);
+//     cv::imshow("Inflated Dynamic Obstacles", inflated_dynamic_grid_);
+//     cv::waitKey(1);
+
+//     // Step 3: Merge with static inflated map
+//     occupancy_grid_ = inflated_static_grid_.clone();
+//     occupancy_grid_ |= inflated_dynamic_grid_;
+
+//     // Step 4: Replanning logic
+//     if (!has_last_goal_)
+//         return;
+
+//     float dx = current_pose_.position.x - last_goal_.pose.position.x;
+//     float dy = current_pose_.position.y - last_goal_.pose.position.y;
+//     if (std::hypot(dx, dy) < 0.2)
+//     {
+//         RCLCPP_INFO(this->get_logger(), "✅ Robot reached goal — no replanning required.");
+//         table_mode_ = false;
+//         return;
+//     }
+
+//     bool path_obstructed = false;
+//     for (const auto &pt : last_computed_path_)
+//     {
+//         if (pt.x >= 0 && pt.x < occupancy_grid_.cols &&
+//             pt.y >= 0 && pt.y < occupancy_grid_.rows &&
+//             inflated_dynamic_grid_.at<uchar>(pt.y, pt.x) == 255)
+//         {
+//             path_obstructed = true;
+//             break;
+//         }
+//     }
+
+//     if (path_obstructed)
+//     {
+//         RCLCPP_WARN(this->get_logger(), "⚠️ Path blocked by inflated dynamic obstacle — replanning...");
+//         std::this_thread::sleep_for(std::chrono::seconds(2));
+//         pose_callback(std::make_shared<geometry_msgs::msg::PoseStamped>(last_goal_));
+//     }
+// }
+
+
+//with ttl implemented
+
+void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
+{
+    if (msg->info.width != raw_static_grid_.cols || msg->info.height != raw_static_grid_.rows)
+    {
+        RCLCPP_WARN(this->get_logger(), "❌ Mismatch in grid dimensions. Skipping dynamic update.");
+        return;
+    }
+
+    // ✅ Step 0: Clear previous overlays to prevent ghost obstacles
+    dynamic_overlay_grid_ = cv::Mat::zeros(raw_static_grid_.size(), CV_8UC1);
+    inflated_dynamic_grid_ = cv::Mat::zeros(raw_static_grid_.size(), CV_8UC1);
+
+    // Step 1: Convert to binary unknown obstacle mask from incoming occupancy grid
+    int count = 0;
+    for (int y = 0; y < msg->info.height; ++y)
+    {
+        for (int x = 0; x < msg->info.width; ++x)
+        {
+            int idx = y * msg->info.width + x;
+            if (msg->data[idx] == 100)
+            {
+                dynamic_overlay_grid_.at<uchar>(y, x) = 255;
+                count++;
+            }
+        }
+    }
+
+    // RCLCPP_INFO(this->get_logger(), "📊 Detected %d dynamic obstacle cells from updated occupancy grid", count);
+
+    // Step 2: Inflate dynamic obstacles with a kernel (half the static inflation size)
+    float static_inflation_radius_m = 0.7;
+    float dynamic_inflation_radius_m = static_inflation_radius_m / 4.0;
+    int dynamic_inflation_radius = static_cast<int>(std::ceil(dynamic_inflation_radius_m / map_meta_.resolution));
+
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+                                               cv::Size(2 * dynamic_inflation_radius + 1,
+                                                        2 * dynamic_inflation_radius + 1));
+    cv::dilate(dynamic_overlay_grid_, inflated_dynamic_grid_, kernel);
+
+    // Optional: Debug view of inflated dynamic obstacle mask
+    cv::namedWindow("Inflated Dynamic Obstacles", cv::WINDOW_NORMAL);
+    cv::imshow("Inflated Dynamic Obstacles", inflated_dynamic_grid_);
+    cv::waitKey(1);
+
+    // Step 3: Merge dynamic mask with static inflated map
+    occupancy_grid_ = inflated_static_grid_.clone();  // start fresh
+    occupancy_grid_ |= inflated_dynamic_grid_;        // merge dynamic layer
+
+    // Step 4: Replanning decision
+    if (!has_last_goal_)
+        return;
+
+    float dx = current_pose_.position.x - last_goal_.pose.position.x;
+    float dy = current_pose_.position.y - last_goal_.pose.position.y;
+    if (std::hypot(dx, dy) < 0.2)
+    {
+        RCLCPP_INFO(this->get_logger(), "✅ Robot reached goal — no replanning required.");
+        table_mode_ = false;
+        return;
+    }
+
+    // Check if any path point is now blocked by inflated dynamic obstacles
+    bool path_obstructed = false;
+    for (const auto &pt : last_computed_path_)
+    {
+        if (pt.x >= 0 && pt.x < occupancy_grid_.cols &&
+            pt.y >= 0 && pt.y < occupancy_grid_.rows &&
+            inflated_dynamic_grid_.at<uchar>(pt.y, pt.x) == 255)
+        {
+            path_obstructed = true;
+            break;
+        }
+    }
+
+    if (path_obstructed)
+    {
+        RCLCPP_WARN(this->get_logger(), "⚠️ Path blocked by inflated dynamic obstacle — replanning...");
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        pose_callback(std::make_shared<geometry_msgs::msg::PoseStamped>(last_goal_));
+    }
+}
+
+
 
     void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
@@ -690,81 +894,6 @@ private:
         }
         return {}; // No path found
     }
-    // bool isValidGoal(const Point &p)
-    // {
-    //     // Check bounds first
-    //     if (p.x < 0 || p.x >= occupancy_grid_.cols || p.y < 0 || p.y >= occupancy_grid_.rows)
-    //         return false;
-
-    //     // Access the cell safely (note: OpenCV uses (row, col) = (y, x))
-    //     return occupancy_grid_.at<uchar>(p.y, p.x) == 0;  // 0 = free
-    // }
-
-    // std::vector<Point> a_star(const Point &start, const Point &original_goal)
-    // {
-    // Point goal = original_goal;
-
-    // if (table_mode_)
-    // {
-    //     float dx = original_goal.x - start.x;
-    //     float dy = original_goal.y - start.y;
-    //     float distance = std::sqrt(dx * dx + dy * dy);
-
-    //     if (distance > 0.5f)
-    //     {
-    //         float angle = std::atan2(dy, dx);
-    //         goal.x = static_cast<int>(std::round(original_goal.x - 0.5f * std::cos(angle)));
-    //         goal.y = static_cast<int>(std::round(original_goal.y - 0.5f * std::sin(angle)));
-
-    //         RCLCPP_INFO(this->get_logger(), "📐 Adjusted goal to (%d, %d) based on angle %.2f radians", goal.x, goal.y, angle);
-    //     }
-    //     else
-    //     {
-    //         goal = original_goal;
-    //         RCLCPP_WARN(this->get_logger(), "⚠️ Distance too small to apply backoff — using original goal");
-    //     }
-    // }
-
-    //     std::priority_queue<std::tuple<float, Point>, std::vector<std::tuple<float, Point>>, CompareFScore> open_list;
-    //     open_list.push({0.0f, start});
-    //     std::unordered_map<Point, Point> came_from;
-    //     std::unordered_map<Point, float> g_score;
-    //     g_score[start] = 0.0f;
-
-    //     while (!open_list.empty())
-    //     {
-    //         Point current = std::get<1>(open_list.top());
-    //         open_list.pop();
-
-    //         RCLCPP_DEBUG(this->get_logger(), "Exploring node: (%d, %d)", current.x, current.y);
-
-    //         if (current == goal)
-    //         {
-    //             std::vector<Point> path;
-    //             while (came_from.find(current) != came_from.end())
-    //             {
-    //                 path.push_back(current);
-    //                 current = came_from[current];
-    //             }
-    //             std::reverse(path.begin(), path.end());
-    //             return path;
-    //         }
-
-    //         for (const auto &neighbor : get_neighbors(current))
-    //         {
-    //             float tentative_g_score = g_score[current] + heuristic(current, neighbor);
-    //             RCLCPP_DEBUG(this->get_logger(), "Neighbor: (%d, %d), Tentative g_score: %.2f", neighbor.x, neighbor.y, tentative_g_score);
-    //             if (g_score.find(neighbor) == g_score.end() || tentative_g_score < g_score[neighbor])
-    //             {
-    //                 came_from[neighbor] = current;
-    //                 g_score[neighbor] = tentative_g_score;
-    //                 float f_score = tentative_g_score + heuristic(neighbor, goal);
-    //                 open_list.push({f_score, neighbor});
-    //             }
-    //         }
-    //     }
-    //     return {}; // No path found
-    // }
 
     void publish_path(const std::vector<Point> &path)
     {
@@ -924,90 +1053,181 @@ private:
         return closest_idx;
     }
 
+    // void sentry_path_callback(const nav_msgs::msg::Path::SharedPtr msg)
+    // {
+    //     if (msg->poses.empty())
+    //     {
+    //         RCLCPP_WARN(this->get_logger(), "Received empty path.");
+    //         return;
+    //     }
+
+    //     std::vector<geometry_msgs::msg::PoseStamped> sorted_goals;
+
+    //     if (sentry_mode_)
+    //     {
+    //         // Reorder based on closest goal
+    //         Point robot_pos = world_to_grid(current_pose_.position.x, current_pose_.position.y);
+    //         const auto &poses = msg->poses;
+
+    //         int closest_idx = 0;
+    //         double min_dist = std::numeric_limits<double>::max();
+
+    //         for (size_t i = 0; i < poses.size(); ++i)
+    //         {
+    //             Point goal_pt = world_to_grid(poses[i].pose.position.x, poses[i].pose.position.y);
+    //             double dx = goal_pt.x - robot_pos.x;
+    //             double dy = goal_pt.y - robot_pos.y;
+    //             double dist = std::hypot(dx, dy);
+
+    //             if (dist < min_dist)
+    //             {
+    //                 min_dist = dist;
+    //                 closest_idx = i;
+    //             }
+    //         }
+
+    //         for (size_t i = 0; i < poses.size(); ++i)
+    //         {
+    //             sorted_goals.push_back(poses[(closest_idx + i) % poses.size()]);
+    //         }
+
+    //         RCLCPP_INFO(this->get_logger(), "Reordered sentry goals from closest index %d", closest_idx);
+    //     }
+    //     else
+    //     {
+    //         sorted_goals = msg->poses; // use as-is
+    //     }
+
+    //     // Now convert goals into a full path
+    //     std::vector<Point> full_path;
+    //     for (size_t i = 0; i < sorted_goals.size() - 1; ++i)
+    //     {
+    //         Point start = world_to_grid(sorted_goals[i].pose.position.x, sorted_goals[i].pose.position.y);
+    //         Point goal = world_to_grid(sorted_goals[i + 1].pose.position.x, sorted_goals[i + 1].pose.position.y);
+
+    //         std::vector<Point> segment = a_star(start, goal);
+    //         full_path.insert(full_path.end(), segment.begin(), segment.end());
+    //     }
+
+    //     if (full_path.empty())
+    //     {
+    //         RCLCPP_WARN(this->get_logger(), "No valid path found.");
+    //         return;
+    //     }
+
+    //     last_computed_path_ = full_path;
+    //     RCLCPP_INFO(this->get_logger(), "Published path with %zu points", full_path.size());
+    //     publish_path(full_path);
+    // }
+
     void sentry_path_callback(const nav_msgs::msg::Path::SharedPtr msg)
+{
+    if (msg->poses.empty())
     {
-        if (msg->poses.empty())
-        {
-            RCLCPP_WARN(this->get_logger(), "Received empty path.");
-            return;
-        }
-
-        std::vector<geometry_msgs::msg::PoseStamped> sorted_goals;
-
-        if (sentry_mode_)
-        {
-            // Reorder based on closest goal
-            Point robot_pos = world_to_grid(current_pose_.position.x, current_pose_.position.y);
-            const auto &poses = msg->poses;
-
-            int closest_idx = 0;
-            double min_dist = std::numeric_limits<double>::max();
-
-            for (size_t i = 0; i < poses.size(); ++i)
-            {
-                Point goal_pt = world_to_grid(poses[i].pose.position.x, poses[i].pose.position.y);
-                double dx = goal_pt.x - robot_pos.x;
-                double dy = goal_pt.y - robot_pos.y;
-                double dist = std::hypot(dx, dy);
-
-                if (dist < min_dist)
-                {
-                    min_dist = dist;
-                    closest_idx = i;
-                }
-            }
-
-            for (size_t i = 0; i < poses.size(); ++i)
-            {
-                sorted_goals.push_back(poses[(closest_idx + i) % poses.size()]);
-            }
-
-            RCLCPP_INFO(this->get_logger(), "Reordered sentry goals from closest index %d", closest_idx);
-        }
-        else
-        {
-            sorted_goals = msg->poses; // use as-is
-        }
-
-        // Now convert goals into a full path
-        std::vector<Point> full_path;
-        for (size_t i = 0; i < sorted_goals.size() - 1; ++i)
-        {
-            Point start = world_to_grid(sorted_goals[i].pose.position.x, sorted_goals[i].pose.position.y);
-            Point goal = world_to_grid(sorted_goals[i + 1].pose.position.x, sorted_goals[i + 1].pose.position.y);
-
-            std::vector<Point> segment = a_star(start, goal);
-            full_path.insert(full_path.end(), segment.begin(), segment.end());
-        }
-
-        if (full_path.empty())
-        {
-            RCLCPP_WARN(this->get_logger(), "No valid path found.");
-            return;
-        }
-
-        last_computed_path_ = full_path;
-        RCLCPP_INFO(this->get_logger(), "Published path with %zu points", full_path.size());
-        publish_path(full_path);
+        RCLCPP_WARN(this->get_logger(), "Received empty sentry path.");
+        return;
     }
+
+    std::vector<geometry_msgs::msg::PoseStamped> sorted_goals;
+
+    if (sentry_mode_)
+    {
+        // Reorder based on proximity to robot
+        Point robot_pos = world_to_grid(current_pose_.position.x, current_pose_.position.y);
+        const auto &poses = msg->poses;
+
+        int closest_idx = 0;
+        double min_dist = std::numeric_limits<double>::max();
+
+        for (size_t i = 0; i < poses.size(); ++i)
+        {
+            Point goal_pt = world_to_grid(poses[i].pose.position.x, poses[i].pose.position.y);
+            double dx = goal_pt.x - robot_pos.x;
+            double dy = goal_pt.y - robot_pos.y;
+            double dist = std::hypot(dx, dy);
+
+            if (dist < min_dist)
+            {
+                min_dist = dist;
+                closest_idx = i;
+            }
+        }
+
+        for (size_t i = 0; i < poses.size(); ++i)
+        {
+            sorted_goals.push_back(poses[(closest_idx + i) % poses.size()]);
+        }
+
+        RCLCPP_INFO(this->get_logger(), "Reordered sentry goals from closest index %d", closest_idx);
+    }
+    else
+    {
+        sorted_goals = msg->poses;
+    }
+
+    // Store for continuous loop
+    sentry_goals_ = sorted_goals;
+    current_sentry_goal_idx_ = 0;
+    sentry_active_ = true;
+    interrupted_ = false;
+
+    // Start path to first goal
+    pose_callback(std::make_shared<geometry_msgs::msg::PoseStamped>(sentry_goals_[0]));
+}
+
+    void monitor_and_advance_sentry()
+{
+    if (!sentry_active_ || sentry_goals_.empty() || interrupted_)
+        return;
+
+    geometry_msgs::msg::PoseStamped target = sentry_goals_[current_sentry_goal_idx_];
+    float dx = current_pose_.position.x - target.pose.position.x;
+    float dy = current_pose_.position.y - target.pose.position.y;
+    float dist = std::hypot(dx, dy);
+
+    if (dist < 0.3)
+    {
+        current_sentry_goal_idx_ = (current_sentry_goal_idx_ + 1) % sentry_goals_.size();
+        RCLCPP_INFO(this->get_logger(), "🔁 Advancing to next sentry goal (%d/%zu)", 
+                    current_sentry_goal_idx_ + 1, sentry_goals_.size());
+
+        pose_callback(std::make_shared<geometry_msgs::msg::PoseStamped>(
+            sentry_goals_[current_sentry_goal_idx_]));
+    }
+}
+
+
+    // void interrupt_callback(const std_msgs::msg::Bool::SharedPtr msg)
+    // {
+    //     interrupted_ = msg->data;
+
+    //     if (interrupted_ && sentry_mode_)
+    //     {
+    //         last_computed_path_.clear();
+    //         has_last_goal_ = false;
+
+    //         nav_msgs::msg::Path empty_path;
+    //         empty_path.header.frame_id = "map";
+    //         empty_path.header.stamp = this->get_clock()->now();
+    //         path_publisher_->publish(empty_path);
+
+    //         RCLCPP_WARN(this->get_logger(), "🚨 Interrupt received! Cleared last goal and path.");
+    //     }
+    // }
 
     void interrupt_callback(const std_msgs::msg::Bool::SharedPtr msg)
+{
+    interrupted_ = msg->data;
+
+    if (interrupted_)
     {
-        interrupted_ = msg->data;
-
-        if (interrupted_ && sentry_mode_)
-        {
-            last_computed_path_.clear();
-            has_last_goal_ = false;
-
-            nav_msgs::msg::Path empty_path;
-            empty_path.header.frame_id = "map";
-            empty_path.header.stamp = this->get_clock()->now();
-            path_publisher_->publish(empty_path);
-
-            RCLCPP_WARN(this->get_logger(), "🚨 Interrupt received! Cleared last goal and path.");
-        }
+        sentry_active_ = false;
+        sentry_goals_.clear();
+        current_sentry_goal_idx_ = 0;
+        RCLCPP_WARN(this->get_logger(), "🛑 Sentry loop interrupted and cleared.");
     }
+}
+
 
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr obstacle_pub_;
 };
@@ -1019,1371 +1239,3 @@ int main(int argc, char **argv)
     rclcpp::shutdown();
     return 0;
 }
-
-//////////////////////////////SLAM CODE
-
-// #include <rclcpp/rclcpp.hpp>
-// #include <geometry_msgs/msg/pose_stamped.hpp>
-// #include <nav_msgs/msg/path.hpp>
-// #include <nav_msgs/msg/odometry.hpp>
-// #include <yaml-cpp/yaml.h>
-// #include <opencv2/opencv.hpp>
-// #include <queue>
-// #include <unordered_map>
-// #include <cmath>
-// #include <algorithm>
-
-// #include <geometry_msgs/msg/pose_array.hpp>
-// #include <geometry_msgs/msg/pose.hpp>
-
-// #include "nav_msgs/msg/occupancy_grid.hpp"
-
-// // added for localisation
-// #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
-// #include <tf2/LinearMath/Quaternion.h>
-// #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-
-// using std::placeholders::_1;
-
-// struct MapMeta
-// {
-//     std::string image_path;
-//     float resolution;
-//     float origin_x;
-//     float origin_y;
-//     float occupied_thresh;
-//     float free_thresh;
-//     bool negate;
-// };
-
-// struct Point
-// {
-//     int x, y;
-//     bool operator==(const Point &other) const
-//     {
-//         return x == other.x && y == other.y;
-//     }
-// };
-
-// namespace std
-// {
-//     template <>
-//     struct hash<Point>
-//     {
-//         std::size_t operator()(const Point &p) const
-//         {
-//             return std::hash<int>()(p.x) ^ std::hash<int>()(p.y);
-//         }
-//     };
-// }
-
-// struct CompareFScore
-// {
-//     bool operator()(const std::tuple<float, Point> &a, const std::tuple<float, Point> &b) const
-//     {
-//         return std::get<0>(a) > std::get<0>(b);
-//     }
-// };
-
-// class PathToGoalClient : public rclcpp::Node
-// {
-// public:
-//     PathToGoalClient() : Node("path_planner")
-//     {
-//         path_publisher_ = this->create_publisher<nav_msgs::msg::Path>("computed_path", 10);
-//         goal_subscriber_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-//             "/pose_topic", 10, std::bind(&PathToGoalClient::pose_callback, this, _1));
-//         odometry_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
-//             "odom", 10, std::bind(&PathToGoalClient::odometry_callback, this, _1));
-
-//         // map_meta_ = load_map_yaml("gallery_map.yaml");
-//         // int inflation_radius = 4;//2.75;
-
-//         float inflation_radius_m = 0.15;  // meters
-//         int inflation_radius = static_cast<int>(std::ceil(inflation_radius_m / map_meta_.resolution));
-
-//         // auto [inflated_grid, visualization_grid] = load_map_image(map_meta_.image_path, map_meta_, inflation_radius);
-
-//         // auto [raw_grid, inflated_grid, visualization] = load_map_image(map_meta_.image_path, map_meta_, inflation_radius);
-// // raw_static_grid_ = raw_grid;
-// // inflated_static_grid_ = inflated_grid;
-// // occupancy_grid_ = inflated_grid.clone();  // this is the grid A* uses and gets updated
-// // visualization_grid_ = visualization;
-
-//         // occupancy_grid_ = inflated_grid;
-//         // visualization_grid_ = visualization_grid;
-
-//         cv::imwrite("debug_grid_with_inflation.png", visualization_grid_);
-//         RCLCPP_INFO(this->get_logger(), "Saved occupancy grid with inflation to debug_grid_with_inflation.png");
-
-//         obstacle_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/known_static_obstacles", 10);
-//         extract_static_obstacles();
-
-//         dynamic_grid_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-//             "/updated_occupancy_grid", 10,
-//             std::bind(&PathToGoalClient::dynamic_grid_callback, this, _1));
-
-//         static_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/static_occupancy_grid", 1);
-//         occupancy_timer_ = this->create_wall_timer(
-//             std::chrono::seconds(1),
-//             std::bind(&PathToGoalClient::publish_static_grid, this));
-
-//         initialpose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 10);
-//         // initialpose_timer_ = this->create_wall_timer(
-//         //     std::chrono::seconds(2),
-//         //     std::bind(&PathToGoalClient::publish_initial_pose, this));
-
-//         // === Create a window to show the grid live ===
-//         cv::namedWindow("Live Occupancy Grid", cv::WINDOW_NORMAL);
-//         live_display_timer_ = this->create_wall_timer(
-//             std::chrono::milliseconds(500),
-//             std::bind(&PathToGoalClient::update_live_display, this));
-
-//               // base for applying dynamic obstacles
-//   // keep the clean base map
-
-//   slam_map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-//     "/map", 10, std::bind(&PathToGoalClient::map_callback, this, _1));
-
-//     }
-
-// private:
-//     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher_;
-//     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_subscriber_;
-//     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber_;
-//     MapMeta map_meta_;
-//     cv::Mat occupancy_grid_;
-//     cv::Mat visualization_grid_;
-//     geometry_msgs::msg::Pose current_pose_;
-
-//     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr dynamic_grid_sub_;
-
-//     geometry_msgs::msg::PoseStamped last_goal_;
-//     bool has_last_goal_ = false;
-
-//     rclcpp::TimerBase::SharedPtr occupancy_timer_;
-//     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr static_grid_pub_;
-
-//     // added for localisation
-//     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initialpose_pub_;
-//     rclcpp::TimerBase::SharedPtr initialpose_timer_;
-//     bool initialpose_sent_ = false;
-
-//     // cv::Mat raw_static_grid_;     // original static map before inflation
-// cv::Mat base_grid_;           // static + dynamic obstacles before inflation
-//   // keeps raw uninflated static + dynamic obstacles
-// cv::Mat raw_static_grid_;           // from PGMap
-// cv::Mat inflated_static_grid_;      // static + static inflation only
-// cv::Mat dynamic_overlay_grid_;      // raw dynamic obstacles
-// cv::Mat inflated_dynamic_grid_;     // dynamic + inflated
-// // cv::Mat occupancy_grid_;            // final grid used for A*
-
-// std::vector<Point> last_computed_path_;
-
-//   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr slam_map_sub_;
-// bool has_received_map_ = false;
-
-// void map_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
-// {
-//     int width = msg->info.width;
-//     int height = msg->info.height;
-//     float resolution = msg->info.resolution;
-//     map_meta_.resolution = resolution;
-//     map_meta_.origin_x = msg->info.origin.position.x;
-//     map_meta_.origin_y = msg->info.origin.position.y;
-
-//     RCLCPP_INFO(this->get_logger(), "Received live SLAM map: %dx%d @ %.2fm", width, height, resolution);
-
-//     // Convert OccupancyGrid to cv::Mat
-//     cv::Mat raw_map(height, width, CV_8UC1);
-//     for (int y = 0; y < height; ++y)
-//     {
-//         for (int x = 0; x < width; ++x)
-//         {
-//             int idx = y * width + x;
-//             int8_t val = msg->data[idx];
-//             if (val == 100)
-//                 raw_map.at<uchar>(y, x) = 255; // Occupied
-//             else if (val == 0)
-//                 raw_map.at<uchar>(y, x) = 0;   // Free
-//             else
-//                 raw_map.at<uchar>(y, x) = 127; // Unknown
-//         }
-//     }
-
-//     // Save raw grid
-//     raw_static_grid_ = raw_map.clone();
-//     base_grid_ = raw_static_grid_.clone();
-//     // Inflate obstacles
-//     int inflation_radius = static_cast<int>(std::ceil(0.15 / resolution));  // 15cm inflation
-//     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-//                     cv::Size(2 * inflation_radius + 1, 2 * inflation_radius + 1));
-//     cv::Mat inflated_map;
-//     cv::dilate(raw_map, inflated_map, kernel);
-
-//     inflated_static_grid_ = inflated_map.clone();
-//     occupancy_grid_ = inflated_static_grid_.clone();
-
-//     // Visualization grid
-//     cv::cvtColor(raw_map, visualization_grid_, cv::COLOR_GRAY2BGR);
-//     for (int y = 0; y < inflated_map.rows; ++y)
-//     {
-//         for (int x = 0; x < inflated_map.cols; ++x)
-//         {
-//             if (inflated_map.at<uchar>(y, x) == 255 && raw_map.at<uchar>(y, x) != 255)
-//                 visualization_grid_.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 255, 255); // Yellow = inflated
-//         }
-//     }
-
-//     RCLCPP_INFO(this->get_logger(), "Live SLAM map processed with inflation.");
-// }
-
-// void publish_initial_pose()
-// {
-//     if (initialpose_sent_)
-//         return;
-
-//     geometry_msgs::msg::PoseWithCovarianceStamped msg;
-//     msg.header.stamp = this->get_clock()->now();
-//     msg.header.frame_id = "map";  // this is critical
-
-//     // Estimated starting position in the map frame
-//     msg.pose.pose.position.x = 3.1263811929744816 + 0.2;  // match Gazebo offset
-//     msg.pose.pose.position.y = 3.3035293034059070 + 0.2;
-//     msg.pose.pose.position.z = 0.0;
-
-//     // Rotate -90 degrees to align with rotated map
-//     tf2::Quaternion q;
-//     q.setRPY(0, 0, -M_PI_2);  // yaw in radians
-//     msg.pose.pose.orientation = tf2::toMsg(q);
-
-//     // Covariance for AMCL
-//     msg.pose.covariance[0] = 0.25;    // x variance
-//     msg.pose.covariance[7] = 0.25;    // y variance
-//     msg.pose.covariance[35] = 0.0685; // yaw variance
-
-//     initialpose_pub_->publish(msg);
-//     initialpose_sent_ = true;
-
-//     RCLCPP_INFO(this->get_logger(), "✅ Published rotated initial pose for AMCL.");
-// }
-
-// ////
-
-//     void publish_static_grid()
-//     {
-//         nav_msgs::msg::OccupancyGrid grid_msg;
-//         grid_msg.header.stamp = this->now();
-//         grid_msg.header.frame_id = "map";
-
-//         grid_msg.info.resolution = map_meta_.resolution;
-//         grid_msg.info.width = occupancy_grid_.cols;
-//         grid_msg.info.height = occupancy_grid_.rows;
-//         grid_msg.info.origin.position.x = map_meta_.origin_x;
-//         grid_msg.info.origin.position.y = map_meta_.origin_y;
-//         grid_msg.info.origin.orientation.w = 1.0;
-
-//         grid_msg.data.resize(grid_msg.info.width * grid_msg.info.height);
-
-//         for (int y = 0; y < occupancy_grid_.rows; ++y)
-//         {
-//             for (int x = 0; x < occupancy_grid_.cols; ++x)
-//             {
-//                 int idx = y * occupancy_grid_.cols + x;
-//                 uchar val = occupancy_grid_.at<uchar>(y, x);
-//                 if (val == 255)
-//                     grid_msg.data[idx] = 100;
-//                 else if (val == 0)
-//                     grid_msg.data[idx] = 0;
-//                 else
-//                     grid_msg.data[idx] = -1;
-//             }
-//         }
-
-//         static_grid_pub_->publish(grid_msg);
-//     }
-
-//     // ... (Existing member variables remain unchanged)
-//     rclcpp::TimerBase::SharedPtr live_display_timer_;
-
-//     void update_live_display()
-//     {
-//         cv::Mat debug_view;
-//         cv::cvtColor(occupancy_grid_, debug_view, cv::COLOR_GRAY2BGR);
-//         cv::imshow("Live Occupancy Grid", debug_view);
-//         cv::waitKey(1);
-//     }
-
-// void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
-// {
-//     if (msg->info.width != raw_static_grid_.cols || msg->info.height != raw_static_grid_.rows)
-//     {
-//         RCLCPP_WARN(this->get_logger(), "Mismatch in grid dimensions. Skipping dynamic update.");
-//         return;
-//     }
-
-//     // Step 1: Convert to binary unknown obstacle mask
-//     dynamic_overlay_grid_ = cv::Mat::zeros(raw_static_grid_.size(), CV_8UC1);
-//     for (int y = 0; y < msg->info.height; ++y)
-//     {
-//         for (int x = 0; x < msg->info.width; ++x)
-//         {
-//             int idx = y * msg->info.width + x;
-//             if (msg->data[idx] == 100)
-//                 dynamic_overlay_grid_.at<uchar>(y, x) = 255;
-//         }
-//     }
-
-//     // Step 2: Inflate dynamic obstacles
-//     // int dynamic_inflation_radius = 3.5;  // adjustable
-
-//             float dynamic_inflation_radius_m = 0.3;  // meters
-//         int dynamic_inflation_radius = static_cast<int>(std::ceil(dynamic_inflation_radius_m / map_meta_.resolution));
-//     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-//                                                cv::Size(2 * dynamic_inflation_radius + 1, 2 * dynamic_inflation_radius + 1));
-//     cv::dilate(dynamic_overlay_grid_, inflated_dynamic_grid_, kernel);
-
-//     // Step 3: Merge with static inflated map
-//     occupancy_grid_ = inflated_static_grid_.clone();  // start from static inflated
-//     occupancy_grid_ |= inflated_dynamic_grid_;        // merge dynamic
-
-//     // Optional: visual debug overlay
-//     for (int y = 0; y < occupancy_grid_.rows; ++y)
-//     {
-//         for (int x = 0; x < occupancy_grid_.cols; ++x)
-//         {
-//             if (inflated_dynamic_grid_.at<uchar>(y, x) == 255)
-//                 visualization_grid_.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);  // red for dynamic
-//         }
-//     }
-
-//     RCLCPP_INFO(this->get_logger(), "✅ Dynamic grid merged and inflated with radius %.2f", dynamic_inflation_radius);
-
-//     if (!has_last_goal_)
-//         return;
-
-//     float dx = current_pose_.position.x - last_goal_.pose.position.x;
-//     float dy = current_pose_.position.y - last_goal_.pose.position.y;
-//     if (std::hypot(dx, dy) < 0.2)
-//     {
-//         RCLCPP_INFO(this->get_logger(), "Robot at goal, no replanning.");
-//         return;
-//     }
-
-//     bool path_obstructed = false;
-//     for (const auto &pt : last_computed_path_)
-//     {
-//         if (pt.x >= 0 && pt.x < occupancy_grid_.cols &&
-//             pt.y >= 0 && pt.y < occupancy_grid_.rows &&
-//             inflated_dynamic_grid_.at<uchar>(pt.y, pt.x) == 255)
-//         {
-//             path_obstructed = true;
-//             break;
-//         }
-//     }
-
-//     if (path_obstructed)
-//     {
-//         RCLCPP_WARN(this->get_logger(), "⚠️ Path obstructed by new dynamic obstacle. Replanning...");
-//         pose_callback(std::make_shared<geometry_msgs::msg::PoseStamped>(last_goal_));
-//     }
-// }
-
-//     void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
-//     {
-//         current_pose_ = msg->pose.pose;
-//     }
-
-//     MapMeta load_map_yaml(const std::string &yaml_path)
-//     {
-//         YAML::Node config = YAML::LoadFile(yaml_path);
-//         MapMeta meta;
-//         meta.image_path = config["image"].as<std::string>();
-//         meta.resolution = config["resolution"].as<float>();
-//         meta.origin_x = config["origin"][0].as<float>();
-//         meta.origin_y = config["origin"][1].as<float>();
-//         meta.occupied_thresh = config["occupied_thresh"].as<float>();
-//         meta.free_thresh = config["free_thresh"].as<float>();
-//         meta.negate = config["negate"].as<int>() != 0;
-//         RCLCPP_INFO(this->get_logger(), "Loaded map: %s", yaml_path.c_str());
-//         RCLCPP_INFO(this->get_logger(), "Map resolution: %.2f, Origin: (%.2f, %.2f)", meta.resolution, meta.origin_x, meta.origin_y);
-//         return meta;
-//     }
-
-// // std::pair<cv::Mat, cv::Mat> load_map_image(const std::string &pgm_path, const MapMeta &meta, int static_inflation_radius)
-// // {
-// //     // === Step 1: Load and invert the PGM image ===
-// //     cv::Mat image = cv::imread(pgm_path, cv::IMREAD_GRAYSCALE);
-// //     if (image.empty()) {
-// //         RCLCPP_ERROR(this->get_logger(), "❌ Failed to load map image: %s", pgm_path.c_str());
-// //         throw std::runtime_error("Map image not found");
-// //     }
-// //     image = 255 - image;  // Invert image for ROS map logic
-
-// //     // === Step 2: Create the raw static occupancy grid ===
-// //     cv::Mat raw_grid(image.rows, image.cols, CV_8UC1);
-// //     for (int y = 0; y < image.rows; ++y)
-// //     {
-// //         for (int x = 0; x < image.cols; ++x)
-// //         {
-// //             float val = image.at<uchar>(y, x) / 255.0f;
-// //             if (val > meta.occupied_thresh)
-// //                 raw_grid.at<uchar>(y, x) = 255;   // Obstacle
-// //             else if (val < meta.free_thresh)
-// //                 raw_grid.at<uchar>(y, x) = 0;     // Free
-// //             else
-// //                 raw_grid.at<uchar>(y, x) = 127;   // Unknown
-// //         }
-// //     }
-
-// //     // === Step 3: Save raw grid for future dynamic overlay ===
-// //     raw_static_grid_ = raw_grid.clone();
-
-// //     // === Step 4: Inflate only static obstacles ===
-// //     cv::Mat inflated_grid = raw_grid.clone();
-// //     if (static_inflation_radius > 0)
-// //     {
-// //         cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-// //                                                    cv::Size(2 * static_inflation_radius + 1, 2 * static_inflation_radius + 1));
-// //         cv::dilate(raw_grid, inflated_grid, kernel);
-// //     }
-
-// //     inflated_static_grid_ = inflated_grid.clone();
-
-// //     // === Step 5: Create a visualization grid ===
-// //     cv::Mat visualization_grid;
-// //     cv::cvtColor(raw_grid, visualization_grid, cv::COLOR_GRAY2BGR);
-
-// //     for (int y = 0; y < inflated_grid.rows; ++y)
-// //     {
-// //         for (int x = 0; x < inflated_grid.cols; ++x)
-// //         {
-// //             if (inflated_grid.at<uchar>(y, x) == 255 && raw_grid.at<uchar>(y, x) != 255)
-// //             {
-// //                 visualization_grid.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 255, 255);  // Yellow = inflated
-// //             }
-// //         }
-// //     }
-
-// //     return {inflated_grid, visualization_grid};
-// // }
-
-// std::tuple<cv::Mat, cv::Mat, cv::Mat> load_map_image(const std::string &pgm_path, const MapMeta &meta, int static_inflation_radius)
-// {
-//     // === Step 1: Load and invert the PGM image ===
-//     cv::Mat image = cv::imread(pgm_path, cv::IMREAD_GRAYSCALE);
-//     if (image.empty()) {
-//         RCLCPP_ERROR(this->get_logger(), "❌ Failed to load map image: %s", pgm_path.c_str());
-//         throw std::runtime_error("Map image not found");
-//     }
-//     image = 255 - image;
-
-//     // === Step 2: Create the raw occupancy grid ===
-//     cv::Mat raw_grid(image.rows, image.cols, CV_8UC1);
-//     for (int y = 0; y < image.rows; ++y)
-//     {
-//         for (int x = 0; x < image.cols; ++x)
-//         {
-//             float val = image.at<uchar>(y, x) / 255.0f;
-//             if (val > meta.occupied_thresh)
-//                 raw_grid.at<uchar>(y, x) = 255;
-//             else if (val < meta.free_thresh)
-//                 raw_grid.at<uchar>(y, x) = 0;
-//             else
-//                 raw_grid.at<uchar>(y, x) = 127;
-//         }
-//     }
-
-//     // === Step 3: Inflate static obstacles ===
-//     cv::Mat inflated_grid = raw_grid.clone();
-//     if (static_inflation_radius > 0)
-//     {
-//         cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-//                                                    cv::Size(2 * static_inflation_radius + 1, 2 * static_inflation_radius + 1));
-//         cv::dilate(raw_grid, inflated_grid, kernel);
-//     }
-
-//     // === Step 4: Visualisation
-//     cv::Mat visualization_grid;
-//     cv::cvtColor(raw_grid, visualization_grid, cv::COLOR_GRAY2BGR);
-//     for (int y = 0; y < inflated_grid.rows; ++y)
-//     {
-//         for (int x = 0; x < inflated_grid.cols; ++x)
-//         {
-//             if (inflated_grid.at<uchar>(y, x) == 255 && raw_grid.at<uchar>(y, x) != 255)
-//                 visualization_grid.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 255, 255); // Yellow = inflated
-//         }
-//     }
-
-//     return {raw_grid, inflated_grid, visualization_grid};
-// }
-
-//     Point world_to_grid(float wx, float wy)
-//     {
-//         int gx = static_cast<int>((wx - map_meta_.origin_x) / map_meta_.resolution);
-//         int gy = static_cast<int>((map_meta_.origin_y + map_meta_.resolution * occupancy_grid_.rows - wy) / map_meta_.resolution);
-//         return {gx, gy};
-//     }
-
-//     geometry_msgs::msg::PoseStamped grid_to_pose(int gx, int gy)
-//     {
-//         geometry_msgs::msg::PoseStamped pose;
-//         pose.pose.position.x = gx * map_meta_.resolution + map_meta_.origin_x + map_meta_.resolution / 2.0f;
-//         pose.pose.position.y = map_meta_.origin_y + map_meta_.resolution * occupancy_grid_.rows - (gy * map_meta_.resolution + map_meta_.resolution / 2.0f);
-//         pose.pose.orientation.w = 1.0;
-//         return pose;
-//     }
-
-//     float heuristic(const Point &a, const Point &b)
-//     {
-//         RCLCPP_DEBUG(this->get_logger(), "Heuristic from (%d, %d) to (%d, %d): %.2f", a.x, a.y, b.x, b.y, heuristic(a, b));
-//         return std::hypot(a.x - b.x, a.y - b.y);
-//     }
-
-//     std::vector<Point> get_neighbors(const Point &p)
-//     {
-//         std::vector<Point> neighbors;
-//         std::vector<std::pair<int, int>> deltas = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-//         for (const auto &d : deltas)
-//         {
-//             int nx = p.x + d.first;
-//             int ny = p.y + d.second;
-//             if (nx >= 0 && ny >= 0 && nx < occupancy_grid_.cols && ny < occupancy_grid_.rows)
-//             {
-//                 if (occupancy_grid_.at<uchar>(ny, nx) < 50)
-//                 {
-//                     neighbors.push_back({nx, ny});
-//                 }
-//             }
-//         }
-//         return neighbors;
-//     }
-
-//     std::vector<Point> a_star(const Point &start, const Point &goal)
-//     {
-//         std::priority_queue<std::tuple<float, Point>, std::vector<std::tuple<float, Point>>, CompareFScore> open_list;
-//         open_list.push({0.0f, start});
-//         std::unordered_map<Point, Point> came_from;
-//         std::unordered_map<Point, float> g_score;
-//         g_score[start] = 0.0f;
-
-//         while (!open_list.empty())
-//         {
-//             Point current = std::get<1>(open_list.top());
-//             open_list.pop();
-
-//             RCLCPP_DEBUG(this->get_logger(), "Exploring node: (%d, %d)", current.x, current.y);
-
-//             if (current == goal)
-//             {
-//                 std::vector<Point> path;
-//                 while (came_from.find(current) != came_from.end())
-//                 {
-//                     path.push_back(current);
-//                     current = came_from[current];
-//                 }
-//                 std::reverse(path.begin(), path.end());
-//                 return path;
-//             }
-
-//             for (const auto &neighbor : get_neighbors(current))
-//             {
-//                 float tentative_g_score = g_score[current] + heuristic(current, neighbor);
-//                 RCLCPP_DEBUG(this->get_logger(), "Neighbor: (%d, %d), Tentative g_score: %.2f", neighbor.x, neighbor.y, tentative_g_score);
-//                 if (g_score.find(neighbor) == g_score.end() || tentative_g_score < g_score[neighbor])
-//                 {
-//                     came_from[neighbor] = current;
-//                     g_score[neighbor] = tentative_g_score;
-//                     float f_score = tentative_g_score + heuristic(neighbor, goal);
-//                     open_list.push({f_score, neighbor});
-//                 }
-//             }
-//         }
-//         return {}; // No path found
-//     }
-
-//     void publish_path(const std::vector<Point> &path)
-//     {
-//         nav_msgs::msg::Path ros_path;
-//         ros_path.header.frame_id = "map"; // Make sure the frame_id matches your setup
-//         for (const auto &point : path)
-//         {
-//             ros_path.poses.push_back(grid_to_pose(point.x, point.y));
-//         }
-//         path_publisher_->publish(ros_path);
-//     }
-
-//     void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-//     {
-//         last_goal_ = *msg;
-//         has_last_goal_ = true;
-
-//         RCLCPP_INFO(this->get_logger(), "Received goal pose: (%.2f, %.2f)", msg->pose.position.x, msg->pose.position.y);
-//         RCLCPP_INFO(this->get_logger(), "Current pose: (%.2f, %.2f)", current_pose_.position.x, current_pose_.position.y);
-
-//         Point start = world_to_grid(current_pose_.position.x, current_pose_.position.y);
-//         Point goal = world_to_grid(msg->pose.position.x, msg->pose.position.y);
-
-//         RCLCPP_INFO(this->get_logger(), "Start grid: (%d, %d), Goal grid: (%d, %d)", start.x, start.y, goal.x, goal.y);
-
-//         std::vector<Point> path = a_star(start, goal);
-//         last_computed_path_ = path;
-
-//         if (path.empty())
-//         {
-//             RCLCPP_WARN(this->get_logger(), "No valid path found.");
-//         }
-//         else
-//         {
-//             RCLCPP_INFO(this->get_logger(), "Path found with %zu points.", path.size());
-//         }
-
-//         cv::Mat marked_grid = visualization_grid_.clone();
-//         mark_position(marked_grid, start, cv::Vec3b(255, 0, 0)); // Red
-//         mark_position(marked_grid, goal, cv::Vec3b(0, 0, 255));  // Blue
-//         if (!path.empty())
-//         {
-//             mark_path(marked_grid, path, cv::Vec3b(0, 255, 0)); // Green
-//         }
-
-//         cv::imwrite("debug_grid_with_positions.png", marked_grid);
-
-//         if (!path.empty())
-//         {
-//             publish_path(path);
-//         }
-//     }
-
-//     void mark_position(cv::Mat &grid, const Point &position, const cv::Vec3b &color)
-//     {
-//         // Convert the grid to a 3-channel color image if not already
-//         if (grid.channels() == 1)
-//         {
-//             cv::cvtColor(grid, grid, cv::COLOR_GRAY2BGR);
-//         }
-
-//         // Mark the position with the specified color
-//         if (position.x >= 0 && position.x < grid.cols &&
-//             position.y >= 0 && position.y < grid.rows)
-//         {
-//             grid.at<cv::Vec3b>(position.y, position.x) = color;
-//         }
-//     }
-
-//     void mark_path(cv::Mat &grid, const std::vector<Point> &path, const cv::Vec3b &color)
-//     {
-//         // Ensure the grid is a 3-channel color image
-//         if (grid.channels() == 1)
-//         {
-//             cv::cvtColor(grid, grid, cv::COLOR_GRAY2BGR);
-//         }
-
-//         // Mark each point in the path with the specified color
-//         for (const auto &point : path)
-//         {
-//             if (grid.at<cv::Vec3b>(point.y, point.x) != cv::Vec3b(255, 0, 0) && // Avoid overriding start (red)
-//                 grid.at<cv::Vec3b>(point.y, point.x) != cv::Vec3b(0, 0, 255))
-//             {                                                 // Avoid overriding goal (blue)
-//                 grid.at<cv::Vec3b>(point.y, point.x) = color; // Green for path
-//             }
-//         }
-//     }
-
-//     std::vector<geometry_msgs::msg::Point> known_obstacles_world_;
-
-//     void extract_static_obstacles()
-//     {
-//         // Clear any previously stored obstacles
-//         known_obstacles_world_.clear();
-
-//         // Step 1: Extract obstacle points from the occupancy grid
-//         for (int y = 0; y < occupancy_grid_.rows; ++y)
-//         {
-//             for (int x = 0; x < occupancy_grid_.cols; ++x)
-//             {
-//                 if (occupancy_grid_.at<uchar>(y, x) == 255)
-//                 { // Obstacle cell
-//                     geometry_msgs::msg::Point p;
-//                     p.x = x * map_meta_.resolution + map_meta_.origin_x;
-//                     p.y = y * map_meta_.resolution + map_meta_.origin_y;
-//                     p.z = 0.0; // 2D plane
-//                     known_obstacles_world_.push_back(p);
-//                 }
-//             }
-//         }
-
-//         // Step 2: Convert to PoseArray
-//         geometry_msgs::msg::PoseArray pose_array_msg;
-//         pose_array_msg.header.frame_id = "map";
-//         pose_array_msg.header.stamp = this->get_clock()->now();
-
-//         for (const auto &pt : known_obstacles_world_)
-//         {
-//             geometry_msgs::msg::Pose pose;
-//             pose.position = pt;
-//             pose.orientation.w = 1.0; // Neutral orientation (identity quaternion)
-//             pose_array_msg.poses.push_back(pose);
-//         }
-
-//         // Step 3: Publish
-//         obstacle_pub_->publish(pose_array_msg);
-
-//         RCLCPP_INFO(this->get_logger(), "Published %zu known static obstacles to /known_static_obstacles", pose_array_msg.poses.size());
-//     }
-
-//     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr obstacle_pub_;
-// };
-
-// int main(int argc, char **argv)
-// {
-//     rclcpp::init(argc, argv);
-//     rclcpp::spin(std::make_shared<PathToGoalClient>());
-//     rclcpp::shutdown();
-//     return 0;
-// }
-
-//////////////////////////////////////used to work
-
-// #include <rclcpp/rclcpp.hpp>
-// #include <geometry_msgs/msg/pose_stamped.hpp>
-// #include <nav_msgs/msg/path.hpp>
-// #include <nav_msgs/msg/odometry.hpp>
-// #include <yaml-cpp/yaml.h>
-// #include <opencv2/opencv.hpp>
-// #include <queue>
-// #include <unordered_map>
-// #include <cmath>
-// #include <algorithm>
-
-// #include <geometry_msgs/msg/pose_array.hpp>
-// #include <geometry_msgs/msg/pose.hpp>
-
-// #include "nav_msgs/msg/occupancy_grid.hpp"
-
-// // added for localisation
-// #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
-// #include <tf2/LinearMath/Quaternion.h>
-// #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-
-// using std::placeholders::_1;
-
-// struct MapMeta
-// {
-//     std::string image_path;
-//     float resolution;
-//     float origin_x;
-//     float origin_y;
-//     float occupied_thresh;
-//     float free_thresh;
-//     bool negate;
-// };
-
-// struct Point
-// {
-//     int x, y;
-//     bool operator==(const Point &other) const
-//     {
-//         return x == other.x && y == other.y;
-//     }
-// };
-
-// namespace std
-// {
-//     template <>
-//     struct hash<Point>
-//     {
-//         std::size_t operator()(const Point &p) const
-//         {
-//             return std::hash<int>()(p.x) ^ std::hash<int>()(p.y);
-//         }
-//     };
-// }
-
-// struct CompareFScore
-// {
-//     bool operator()(const std::tuple<float, Point> &a, const std::tuple<float, Point> &b) const
-//     {
-//         return std::get<0>(a) > std::get<0>(b);
-//     }
-// };
-
-// class PathToGoalClient : public rclcpp::Node
-// {
-// public:
-//     PathToGoalClient() : Node("path_planner")
-//     {
-//         path_publisher_ = this->create_publisher<nav_msgs::msg::Path>("computed_path", 10);
-//         goal_subscriber_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-//             "/pose_topic", 10, std::bind(&PathToGoalClient::pose_callback, this, _1));
-//         odometry_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
-//             "odom", 10, std::bind(&PathToGoalClient::odometry_callback, this, _1));
-
-//         map_meta_ = load_map_yaml("gallery_map.yaml");
-//         int inflation_radius = 2.75;
-//         auto [inflated_grid, visualization_grid] = load_map_image(map_meta_.image_path, map_meta_, inflation_radius);
-
-//         occupancy_grid_ = inflated_grid;
-//         visualization_grid_ = visualization_grid;
-
-//         cv::imwrite("debug_grid_with_inflation.png", visualization_grid_);
-//         RCLCPP_INFO(this->get_logger(), "Saved occupancy grid with inflation to debug_grid_with_inflation.png");
-
-//         obstacle_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/known_static_obstacles", 10);
-//         extract_static_obstacles();
-
-//         dynamic_grid_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-//             "/updated_occupancy_grid", 10,
-//             std::bind(&PathToGoalClient::dynamic_grid_callback, this, _1));
-
-//         static_grid_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/static_occupancy_grid", 1);
-//         occupancy_timer_ = this->create_wall_timer(
-//             std::chrono::seconds(1),
-//             std::bind(&PathToGoalClient::publish_static_grid, this));
-
-//         initialpose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 10);
-//         initialpose_timer_ = this->create_wall_timer(
-//             std::chrono::seconds(2),
-//             std::bind(&PathToGoalClient::publish_initial_pose, this));
-
-//         // === Create a window to show the grid live ===
-//         cv::namedWindow("Live Occupancy Grid", cv::WINDOW_NORMAL);
-//         live_display_timer_ = this->create_wall_timer(
-//             std::chrono::milliseconds(500),
-//             std::bind(&PathToGoalClient::update_live_display, this));
-
-//             base_grid_ = raw_static_grid_.clone();  // base for applying dynamic obstacles
-//   // keep the clean base map
-
-//     }
-
-// private:
-//     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher_;
-//     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_subscriber_;
-//     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber_;
-//     MapMeta map_meta_;
-//     cv::Mat occupancy_grid_;
-//     cv::Mat visualization_grid_;
-//     geometry_msgs::msg::Pose current_pose_;
-
-//     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr dynamic_grid_sub_;
-
-//     geometry_msgs::msg::PoseStamped last_goal_;
-//     bool has_last_goal_ = false;
-
-//     rclcpp::TimerBase::SharedPtr occupancy_timer_;
-//     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr static_grid_pub_;
-
-//     // added for localisation
-//     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initialpose_pub_;
-//     rclcpp::TimerBase::SharedPtr initialpose_timer_;
-//     bool initialpose_sent_ = false;
-
-//     // cv::Mat raw_static_grid_;     // original static map before inflation
-// cv::Mat base_grid_;           // static + dynamic obstacles before inflation
-//   // keeps raw uninflated static + dynamic obstacles
-// cv::Mat raw_static_grid_;           // from PGMap
-// cv::Mat inflated_static_grid_;      // static + static inflation only
-// cv::Mat dynamic_overlay_grid_;      // raw dynamic obstacles
-// cv::Mat inflated_dynamic_grid_;     // dynamic + inflated
-// // cv::Mat occupancy_grid_;            // final grid used for A*
-
-// void publish_initial_pose()
-// {
-//     if (initialpose_sent_)
-//         return;
-
-//     geometry_msgs::msg::PoseWithCovarianceStamped msg;
-//     msg.header.stamp = this->get_clock()->now();
-//     msg.header.frame_id = "map";  // this is critical
-
-//     // Estimated starting position in the map frame
-//     msg.pose.pose.position.x = 3.1263811929744816 + 0.2;  // match Gazebo offset
-//     msg.pose.pose.position.y = 3.3035293034059070 + 0.2;
-//     msg.pose.pose.position.z = 0.0;
-
-//     // Rotate -90 degrees to align with rotated map
-//     tf2::Quaternion q;
-//     q.setRPY(0, 0, -M_PI_2);  // yaw in radians
-//     msg.pose.pose.orientation = tf2::toMsg(q);
-
-//     // Covariance for AMCL
-//     msg.pose.covariance[0] = 0.25;    // x variance
-//     msg.pose.covariance[7] = 0.25;    // y variance
-//     msg.pose.covariance[35] = 0.0685; // yaw variance
-
-//     initialpose_pub_->publish(msg);
-//     initialpose_sent_ = true;
-
-//     RCLCPP_INFO(this->get_logger(), "✅ Published rotated initial pose for AMCL.");
-// }
-
-// ////
-
-//     void publish_static_grid()
-//     {
-//         nav_msgs::msg::OccupancyGrid grid_msg;
-//         grid_msg.header.stamp = this->now();
-//         grid_msg.header.frame_id = "map";
-
-//         grid_msg.info.resolution = map_meta_.resolution;
-//         grid_msg.info.width = occupancy_grid_.cols;
-//         grid_msg.info.height = occupancy_grid_.rows;
-//         grid_msg.info.origin.position.x = map_meta_.origin_x;
-//         grid_msg.info.origin.position.y = map_meta_.origin_y;
-//         grid_msg.info.origin.orientation.w = 1.0;
-
-//         grid_msg.data.resize(grid_msg.info.width * grid_msg.info.height);
-
-//         for (int y = 0; y < occupancy_grid_.rows; ++y)
-//         {
-//             for (int x = 0; x < occupancy_grid_.cols; ++x)
-//             {
-//                 int idx = y * occupancy_grid_.cols + x;
-//                 uchar val = occupancy_grid_.at<uchar>(y, x);
-//                 if (val == 255)
-//                     grid_msg.data[idx] = 100;
-//                 else if (val == 0)
-//                     grid_msg.data[idx] = 0;
-//                 else
-//                     grid_msg.data[idx] = -1;
-//             }
-//         }
-
-//         static_grid_pub_->publish(grid_msg);
-//     }
-
-//     // ... (Existing member variables remain unchanged)
-//     rclcpp::TimerBase::SharedPtr live_display_timer_;
-
-//     void update_live_display()
-//     {
-//         cv::Mat debug_view;
-//         cv::cvtColor(occupancy_grid_, debug_view, cv::COLOR_GRAY2BGR);
-//         cv::imshow("Live Occupancy Grid", debug_view);
-//         cv::waitKey(1);
-//     }
-
-//     // void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
-//     // {
-//     //     if (msg->info.width != occupancy_grid_.cols || msg->info.height != occupancy_grid_.rows)
-//     //     {
-//     //         RCLCPP_WARN(this->get_logger(), "Dynamic grid dimensions mismatch. Skipping update.");
-//     //         return;
-//     //     }
-
-//     //     for (size_t y = 0; y < msg->info.height; ++y)
-//     //     {
-//     //         for (size_t x = 0; x < msg->info.width; ++x)
-//     //         {
-//     //             int idx = y * msg->info.width + x;
-//     //             if (msg->data[idx] == 100)
-//     //             {
-//     //                 // occupancy_grid_.at<uchar>(y, x) = 255;
-//     //                 occupancy_grid_.at<uchar>(y, x) = 255;
-//     //                 visualization_grid_.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);  // mark new obstacles in red (optional)
-
-//     //             }
-//     //         }
-//     //     }
-
-//     //     RCLCPP_INFO(this->get_logger(), "Dynamic obstacles merged into main grid.");
-
-//     //     if (has_last_goal_)
-//     //         pose_callback(std::make_shared<geometry_msgs::msg::PoseStamped>(last_goal_));
-//     // }
-
-// void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
-// {
-//     if (msg->info.width != raw_static_grid_.cols || msg->info.height != raw_static_grid_.rows)
-//     {
-//         RCLCPP_WARN(this->get_logger(), "Mismatch in grid dimensions. Skipping dynamic update.");
-//         return;
-//     }
-
-//     // Step 1: Overlay dynamic obstacles
-//     dynamic_overlay_grid_ = cv::Mat::zeros(raw_static_grid_.size(), CV_8UC1);
-//     for (int y = 0; y < msg->info.height; ++y)
-//     {
-//         for (int x = 0; x < msg->info.width; ++x)
-//         {
-//             int idx = y * msg->info.width + x;
-//             if (msg->data[idx] == 100)
-//                 dynamic_overlay_grid_.at<uchar>(y, x) = 255;
-//         }
-//     }
-
-//     // Step 2: Inflate dynamic obstacles separately
-//     int dynamic_inflation_radius = 3.5;  // or different value
-//     cv::Mat kernel_dyn = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-//                                                    cv::Size(2 * dynamic_inflation_radius + 1, 2 * dynamic_inflation_radius + 1));
-//     cv::dilate(dynamic_overlay_grid_, inflated_dynamic_grid_, kernel_dyn);
-
-//     // Step 3: Merge both inflated maps
-//     occupancy_grid_ = inflated_static_grid_.clone();
-//     occupancy_grid_ |= inflated_dynamic_grid_;  // OR operation keeps all obstacles
-
-//     RCLCPP_INFO(this->get_logger(), "✅ Merged static + dynamic inflation into planning grid.");
-
-//     if (has_last_goal_)
-//         pose_callback(std::make_shared<geometry_msgs::msg::PoseStamped>(last_goal_));
-// }
-
-//     void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
-//     {
-//         current_pose_ = msg->pose.pose;
-//     }
-
-//     MapMeta load_map_yaml(const std::string &yaml_path)
-//     {
-//         YAML::Node config = YAML::LoadFile(yaml_path);
-//         MapMeta meta;
-//         meta.image_path = config["image"].as<std::string>();
-//         meta.resolution = config["resolution"].as<float>();
-//         meta.origin_x = config["origin"][0].as<float>();
-//         meta.origin_y = config["origin"][1].as<float>();
-//         meta.occupied_thresh = config["occupied_thresh"].as<float>();
-//         meta.free_thresh = config["free_thresh"].as<float>();
-//         meta.negate = config["negate"].as<int>() != 0;
-//         RCLCPP_INFO(this->get_logger(), "Loaded map: %s", yaml_path.c_str());
-//         RCLCPP_INFO(this->get_logger(), "Map resolution: %.2f, Origin: (%.2f, %.2f)", meta.resolution, meta.origin_x, meta.origin_y);
-//         return meta;
-//     }
-
-// std::pair<cv::Mat, cv::Mat> load_map_image(const std::string &pgm_path, const MapMeta &meta, int static_inflation_radius)
-// {
-//     // === Step 1: Load and invert the PGM image ===
-//     cv::Mat image = cv::imread(pgm_path, cv::IMREAD_GRAYSCALE);
-//     if (image.empty()) {
-//         RCLCPP_ERROR(this->get_logger(), "❌ Failed to load map image: %s", pgm_path.c_str());
-//         throw std::runtime_error("Map image not found");
-//     }
-//     image = 255 - image;  // Invert image for ROS map logic
-
-//     // === Step 2: Create the raw static occupancy grid ===
-//     cv::Mat raw_grid(image.rows, image.cols, CV_8UC1);
-//     for (int y = 0; y < image.rows; ++y)
-//     {
-//         for (int x = 0; x < image.cols; ++x)
-//         {
-//             float val = image.at<uchar>(y, x) / 255.0f;
-//             if (val > meta.occupied_thresh)
-//                 raw_grid.at<uchar>(y, x) = 255;   // Obstacle
-//             else if (val < meta.free_thresh)
-//                 raw_grid.at<uchar>(y, x) = 0;     // Free
-//             else
-//                 raw_grid.at<uchar>(y, x) = 127;   // Unknown
-//         }
-//     }
-
-//     // === Step 3: Save raw grid for future dynamic overlay ===
-//     raw_static_grid_ = raw_grid.clone();
-
-//     // === Step 4: Inflate only static obstacles ===
-//     cv::Mat inflated_grid = raw_grid.clone();
-//     if (static_inflation_radius > 0)
-//     {
-//         cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-//                                                    cv::Size(2 * static_inflation_radius + 1, 2 * static_inflation_radius + 1));
-//         cv::dilate(raw_grid, inflated_grid, kernel);
-//     }
-
-//     inflated_static_grid_ = inflated_grid.clone();
-
-//     // === Step 5: Create a visualization grid ===
-//     cv::Mat visualization_grid;
-//     cv::cvtColor(raw_grid, visualization_grid, cv::COLOR_GRAY2BGR);
-
-//     for (int y = 0; y < inflated_grid.rows; ++y)
-//     {
-//         for (int x = 0; x < inflated_grid.cols; ++x)
-//         {
-//             if (inflated_grid.at<uchar>(y, x) == 255 && raw_grid.at<uchar>(y, x) != 255)
-//             {
-//                 visualization_grid.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 255, 255);  // Yellow = inflated
-//             }
-//         }
-//     }
-
-//     return {inflated_grid, visualization_grid};
-// }
-
-//     Point world_to_grid(float wx, float wy)
-//     {
-//         int gx = static_cast<int>((wx - map_meta_.origin_x) / map_meta_.resolution);
-//         int gy = static_cast<int>((map_meta_.origin_y + map_meta_.resolution * occupancy_grid_.rows - wy) / map_meta_.resolution);
-//         return {gx, gy};
-//     }
-
-//     geometry_msgs::msg::PoseStamped grid_to_pose(int gx, int gy)
-//     {
-//         geometry_msgs::msg::PoseStamped pose;
-//         pose.pose.position.x = gx * map_meta_.resolution + map_meta_.origin_x + map_meta_.resolution / 2.0f;
-//         pose.pose.position.y = map_meta_.origin_y + map_meta_.resolution * occupancy_grid_.rows - (gy * map_meta_.resolution + map_meta_.resolution / 2.0f);
-//         pose.pose.orientation.w = 1.0;
-//         return pose;
-//     }
-
-//     float heuristic(const Point &a, const Point &b)
-//     {
-//         RCLCPP_DEBUG(this->get_logger(), "Heuristic from (%d, %d) to (%d, %d): %.2f", a.x, a.y, b.x, b.y, heuristic(a, b));
-//         return std::hypot(a.x - b.x, a.y - b.y);
-//     }
-
-//     std::vector<Point> get_neighbors(const Point &p)
-//     {
-//         std::vector<Point> neighbors;
-//         std::vector<std::pair<int, int>> deltas = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-//         for (const auto &d : deltas)
-//         {
-//             int nx = p.x + d.first;
-//             int ny = p.y + d.second;
-//             if (nx >= 0 && ny >= 0 && nx < occupancy_grid_.cols && ny < occupancy_grid_.rows)
-//             {
-//                 if (occupancy_grid_.at<uchar>(ny, nx) < 50)
-//                 {
-//                     neighbors.push_back({nx, ny});
-//                 }
-//             }
-//         }
-//         return neighbors;
-//     }
-
-//     std::vector<Point> a_star(const Point &start, const Point &goal)
-//     {
-//         std::priority_queue<std::tuple<float, Point>, std::vector<std::tuple<float, Point>>, CompareFScore> open_list;
-//         open_list.push({0.0f, start});
-//         std::unordered_map<Point, Point> came_from;
-//         std::unordered_map<Point, float> g_score;
-//         g_score[start] = 0.0f;
-
-//         while (!open_list.empty())
-//         {
-//             Point current = std::get<1>(open_list.top());
-//             open_list.pop();
-
-//             RCLCPP_DEBUG(this->get_logger(), "Exploring node: (%d, %d)", current.x, current.y);
-
-//             if (current == goal)
-//             {
-//                 std::vector<Point> path;
-//                 while (came_from.find(current) != came_from.end())
-//                 {
-//                     path.push_back(current);
-//                     current = came_from[current];
-//                 }
-//                 std::reverse(path.begin(), path.end());
-//                 return path;
-//             }
-
-//             for (const auto &neighbor : get_neighbors(current))
-//             {
-//                 float tentative_g_score = g_score[current] + heuristic(current, neighbor);
-//                 RCLCPP_DEBUG(this->get_logger(), "Neighbor: (%d, %d), Tentative g_score: %.2f", neighbor.x, neighbor.y, tentative_g_score);
-//                 if (g_score.find(neighbor) == g_score.end() || tentative_g_score < g_score[neighbor])
-//                 {
-//                     came_from[neighbor] = current;
-//                     g_score[neighbor] = tentative_g_score;
-//                     float f_score = tentative_g_score + heuristic(neighbor, goal);
-//                     open_list.push({f_score, neighbor});
-//                 }
-//             }
-//         }
-//         return {}; // No path found
-//     }
-
-//     void publish_path(const std::vector<Point> &path)
-//     {
-//         nav_msgs::msg::Path ros_path;
-//         ros_path.header.frame_id = "map"; // Make sure the frame_id matches your setup
-//         for (const auto &point : path)
-//         {
-//             ros_path.poses.push_back(grid_to_pose(point.x, point.y));
-//         }
-//         path_publisher_->publish(ros_path);
-//     }
-
-//     // void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-//     // {
-//     //     RCLCPP_INFO(this->get_logger(), "Received goal pose: (%.2f, %.2f)", msg->pose.position.x, msg->pose.position.y);
-//     //     RCLCPP_INFO(this->get_logger(), "Current pose: (%.2f, %.2f)", current_pose_.position.x, current_pose_.position.y);
-
-//     //     // Convert odometry and goal pose to grid coordinates
-//     //     Point start = world_to_grid(current_pose_.position.x, current_pose_.position.y);
-//     //     Point goal = world_to_grid(msg->pose.position.x, msg->pose.position.y);
-
-//     //     RCLCPP_INFO(this->get_logger(), "Start grid: (%d, %d), Goal grid: (%d, %d)", start.x, start.y, goal.x, goal.y);
-
-//     //     // Check if start or goal is in an occupied cell
-//     //     RCLCPP_INFO(this->get_logger(), "Start grid value: %d", occupancy_grid_.at<uchar>(start.y, start.x));
-//     //     // if (occupancy_grid_.at<uchar>(start.y, start.x) == 255) {
-//     //     //     RCLCPP_WARN(this->get_logger(), "Start position is in an occupied cell.");
-//     //     //     return;
-//     //     // }
-//     //     // if (occupancy_grid_.at<uchar>(goal.y, goal.x) >= 50) {
-//     //     //     RCLCPP_WARN(this->get_logger(), "Goal position is in an occupied cell.");
-//     //     //     return;
-//     //     // }
-
-//     //     // Call A* to find path
-//     //     std::vector<Point> path = a_star(start, goal);
-
-//     //     if (path.empty())
-//     //     {
-//     //         RCLCPP_WARN(this->get_logger(), "No valid path found.");
-//     //     }
-//     //     else
-//     //     {
-//     //         RCLCPP_INFO(this->get_logger(), "Path found with %zu points.", path.size());
-//     //     }
-
-//     //     // Clone the visualization grid for marking
-//     //     cv::Mat marked_grid = visualization_grid_.clone();
-
-//     //     // Mark the start and goal positions on the visualization grid
-//     //     mark_position(marked_grid, start, cv::Vec3b(255, 0, 0)); // Red for start
-//     //     mark_position(marked_grid, goal, cv::Vec3b(0, 0, 255));  // Blue for goal
-
-//     //     // Mark the path on the visualization grid
-//     //     if (!path.empty())
-//     //     {
-//     //         mark_path(marked_grid, path, cv::Vec3b(0, 255, 0)); // Green for path
-//     //     }
-
-//     //     // Save the updated visualization grid
-//     //     cv::imwrite("debug_grid_with_positions.png", marked_grid);
-//     //     RCLCPP_INFO(this->get_logger(), "Saved updated occupancy grid with start, goal, path, and inflation to debug_grid_with_positions.png");
-
-//     //     // Publish the path
-//     //     if (!path.empty())
-//     //     {
-//     //         publish_path(path);
-//     //     }
-//     // }
-
-//     void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-//     {
-//         last_goal_ = *msg;
-//         has_last_goal_ = true;
-
-//         RCLCPP_INFO(this->get_logger(), "Received goal pose: (%.2f, %.2f)", msg->pose.position.x, msg->pose.position.y);
-//         RCLCPP_INFO(this->get_logger(), "Current pose: (%.2f, %.2f)", current_pose_.position.x, current_pose_.position.y);
-
-//         Point start = world_to_grid(current_pose_.position.x, current_pose_.position.y);
-//         Point goal = world_to_grid(msg->pose.position.x, msg->pose.position.y);
-
-//         RCLCPP_INFO(this->get_logger(), "Start grid: (%d, %d), Goal grid: (%d, %d)", start.x, start.y, goal.x, goal.y);
-
-//         std::vector<Point> path = a_star(start, goal);
-
-//         if (path.empty())
-//         {
-//             RCLCPP_WARN(this->get_logger(), "No valid path found.");
-//         }
-//         else
-//         {
-//             RCLCPP_INFO(this->get_logger(), "Path found with %zu points.", path.size());
-//         }
-
-//         cv::Mat marked_grid = visualization_grid_.clone();
-//         mark_position(marked_grid, start, cv::Vec3b(255, 0, 0)); // Red
-//         mark_position(marked_grid, goal, cv::Vec3b(0, 0, 255));  // Blue
-//         if (!path.empty())
-//         {
-//             mark_path(marked_grid, path, cv::Vec3b(0, 255, 0)); // Green
-//         }
-
-//         cv::imwrite("debug_grid_with_positions.png", marked_grid);
-
-//         if (!path.empty())
-//         {
-//             publish_path(path);
-//         }
-//     }
-
-//     void mark_position(cv::Mat &grid, const Point &position, const cv::Vec3b &color)
-//     {
-//         // Convert the grid to a 3-channel color image if not already
-//         if (grid.channels() == 1)
-//         {
-//             cv::cvtColor(grid, grid, cv::COLOR_GRAY2BGR);
-//         }
-
-//         // Mark the position with the specified color
-//         if (position.x >= 0 && position.x < grid.cols &&
-//             position.y >= 0 && position.y < grid.rows)
-//         {
-//             grid.at<cv::Vec3b>(position.y, position.x) = color;
-//         }
-//     }
-
-//     void mark_path(cv::Mat &grid, const std::vector<Point> &path, const cv::Vec3b &color)
-//     {
-//         // Ensure the grid is a 3-channel color image
-//         if (grid.channels() == 1)
-//         {
-//             cv::cvtColor(grid, grid, cv::COLOR_GRAY2BGR);
-//         }
-
-//         // Mark each point in the path with the specified color
-//         for (const auto &point : path)
-//         {
-//             if (grid.at<cv::Vec3b>(point.y, point.x) != cv::Vec3b(255, 0, 0) && // Avoid overriding start (red)
-//                 grid.at<cv::Vec3b>(point.y, point.x) != cv::Vec3b(0, 0, 255))
-//             {                                                 // Avoid overriding goal (blue)
-//                 grid.at<cv::Vec3b>(point.y, point.x) = color; // Green for path
-//             }
-//         }
-//     }
-
-//     std::vector<geometry_msgs::msg::Point> known_obstacles_world_;
-
-//     void extract_static_obstacles()
-//     {
-//         // Clear any previously stored obstacles
-//         known_obstacles_world_.clear();
-
-//         // Step 1: Extract obstacle points from the occupancy grid
-//         for (int y = 0; y < occupancy_grid_.rows; ++y)
-//         {
-//             for (int x = 0; x < occupancy_grid_.cols; ++x)
-//             {
-//                 if (occupancy_grid_.at<uchar>(y, x) == 255)
-//                 { // Obstacle cell
-//                     geometry_msgs::msg::Point p;
-//                     p.x = x * map_meta_.resolution + map_meta_.origin_x;
-//                     p.y = y * map_meta_.resolution + map_meta_.origin_y;
-//                     p.z = 0.0; // 2D plane
-//                     known_obstacles_world_.push_back(p);
-//                 }
-//             }
-//         }
-
-//         // Step 2: Convert to PoseArray
-//         geometry_msgs::msg::PoseArray pose_array_msg;
-//         pose_array_msg.header.frame_id = "map";
-//         pose_array_msg.header.stamp = this->get_clock()->now();
-
-//         for (const auto &pt : known_obstacles_world_)
-//         {
-//             geometry_msgs::msg::Pose pose;
-//             pose.position = pt;
-//             pose.orientation.w = 1.0; // Neutral orientation (identity quaternion)
-//             pose_array_msg.poses.push_back(pose);
-//         }
-
-//         // Step 3: Publish
-//         obstacle_pub_->publish(pose_array_msg);
-
-//         RCLCPP_INFO(this->get_logger(), "Published %zu known static obstacles to /known_static_obstacles", pose_array_msg.poses.size());
-//     }
-
-//     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr obstacle_pub_;
-// };
-
-// int main(int argc, char **argv)
-// {
-//     rclcpp::init(argc, argv);
-//     rclcpp::spin(std::make_shared<PathToGoalClient>());
-//     rclcpp::shutdown();
-//     return 0;
-// }

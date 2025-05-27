@@ -263,19 +263,6 @@ path_to_goal4/fast:
 .PHONY : path_to_goal4/fast
 
 #=============================================================================
-# Target rules for targets named path_to_goal5
-
-# Build rule for target.
-path_to_goal5: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 path_to_goal5
-.PHONY : path_to_goal5
-
-# fast build rule for target.
-path_to_goal5/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/path_to_goal5.dir/build.make CMakeFiles/path_to_goal5.dir/build
-.PHONY : path_to_goal5/fast
-
-#=============================================================================
 # Target rules for targets named path_subscriber
 
 # Build rule for target.
@@ -469,30 +456,6 @@ src/path_to_goal4.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/path_to_goal4.dir/build.make CMakeFiles/path_to_goal4.dir/src/path_to_goal4.cpp.s
 .PHONY : src/path_to_goal4.cpp.s
 
-src/path_to_goal5.o: src/path_to_goal5.cpp.o
-.PHONY : src/path_to_goal5.o
-
-# target to build an object file
-src/path_to_goal5.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/path_to_goal5.dir/build.make CMakeFiles/path_to_goal5.dir/src/path_to_goal5.cpp.o
-.PHONY : src/path_to_goal5.cpp.o
-
-src/path_to_goal5.i: src/path_to_goal5.cpp.i
-.PHONY : src/path_to_goal5.i
-
-# target to preprocess a source file
-src/path_to_goal5.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/path_to_goal5.dir/build.make CMakeFiles/path_to_goal5.dir/src/path_to_goal5.cpp.i
-.PHONY : src/path_to_goal5.cpp.i
-
-src/path_to_goal5.s: src/path_to_goal5.cpp.s
-.PHONY : src/path_to_goal5.s
-
-# target to generate assembly for a file
-src/path_to_goal5.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/path_to_goal5.dir/build.make CMakeFiles/path_to_goal5.dir/src/path_to_goal5.cpp.s
-.PHONY : src/path_to_goal5.cpp.s
-
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -515,7 +478,6 @@ help:
 	@echo "... path_to_goal"
 	@echo "... path_to_goal2"
 	@echo "... path_to_goal4"
-	@echo "... path_to_goal5"
 	@echo "... src/goal_publisher.o"
 	@echo "... src/goal_publisher.i"
 	@echo "... src/goal_publisher.s"
@@ -537,9 +499,6 @@ help:
 	@echo "... src/path_to_goal4.o"
 	@echo "... src/path_to_goal4.i"
 	@echo "... src/path_to_goal4.s"
-	@echo "... src/path_to_goal5.o"
-	@echo "... src/path_to_goal5.i"
-	@echo "... src/path_to_goal5.s"
 .PHONY : help
 
 
