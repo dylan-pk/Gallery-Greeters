@@ -29,9 +29,9 @@ from nav_msgs.msg import Path
 audio_to_main_queue = queue.Queue()
 main_to_gui_queue = queue.Queue()
 
-TESTING_MODE = False
-# ACCESS_KEY = "UNuftCmjek2mefFH8OZiwT0LiaeSZJBcFdo1GaqCGcEiKTGQfR7vYQ=="# - Andrew
-ACCESS_KEY = "8HEM095Qo29k5b/OQ01LPFlr+FfiUHVRi0k1N1rYnUQ2ZvZuig2zdA==" # -Anika
+TESTING_MODE = True
+ACCESS_KEY = "UNuftCmjek2mefFH8OZiwT0LiaeSZJBcFdo1GaqCGcEiKTGQfR7vYQ=="# - Andrew
+# ACCESS_KEY = "8HEM095Qo29k5b/OQ01LPFlr+FfiUHVRi0k1N1rYnUQ2ZvZuig2zdA==" # -Anika
 READY_FOR_COMMAND = False
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
@@ -78,12 +78,38 @@ class SpeechToText(Node):
     def setListenEvent(self):
         print("listening event set")
         self.interrupt_pub.publish(Bool(data=True))
+        threading.Timer(0.5, self.clearInterrupt).start
         self.retry_count = 0
         self.listening_event.set()
+
+    def clearInterrupt(self):
+        self.interrupt_pub.publish(Bool(data=False))
     
     def triggerArtwork(self, msg):
         if msg.data == True:
+            print("Received reached_artwork signal, will start scan")
             self.scanNow = True
+            self.performArtworkScan()
+    
+    def performArtworkScan(self):
+        self.artReq.data = True
+        future = self.client_artIdentification.call_async(self.artReq)
+
+        def handle_response(fut):
+            try:
+                response = fut.result()
+                self.scanNow = False
+                print(f"Service response: {response}")
+                if response.success:
+                    self.comms.artWorkInfo(response.message)
+                else:
+                    print(f"Service call failed: {response.message}")
+            except Exception as e:
+                print(f"Service call threw exception: {e}")
+
+        future.add_done_callback(handle_response)
+
+
     
     def commandAudioRecordingLoop(self):
         while True:
@@ -99,7 +125,7 @@ class SpeechToText(Node):
 
     def processText(self, text, testing = False):
         # print(f"processing, listening is disabled")
-        self.interrupt_pub.publish(Bool(data=False))
+        # self.interrupt_pub.publish(Bool(data=False))
         self.sentryModeStarted = False
         if testing == False:
             words = text.split()
@@ -283,6 +309,58 @@ class SpeechToText(Node):
                 pass
         return number
        
+    # def artWorkInfo(self):
+    #     print("Into the Artwork Prompt")
+    #     while True:
+    #         self.comms.SpeakText("which artwork would you like to know about")
+    #         if TESTING_MODE:
+    #             print("1: duchess\n2: squares\n3: boat\n4: seasons\n"
+    #                 "5: clock\n6: skull\n7: scream\n8: poker\n9: lisa\n10: funky")
+    #             artwork_idx = int(input("Which Artwork: "))
+    #             artwork_names = list(self.comms.getArtworkNames().keys())
+    #             artwork = artwork_names[artwork_idx - 1]
+    #         else:
+    #             artwork = self.audioRecording(self.deviceNum, "Art Request", 1)
+    #         actualArt = False
+    #         for word in artwork.split():
+    #             for art in self.comms.getArtworkNames():
+    #                 print(f"word is {word}, artwork is {art}")
+    #                 if word == art:
+    #                     print("matched")
+    #                     requestedArtwork = word
+    #                     actualArt = True
+    #                     break
+                    
+    #         if actualArt:
+    #             # go to the artwork then scan
+    #             break
+    #         else:
+    #             # spin in a circle till you see artwork
+    #             # self.comms.modeChange(3)
+    #             self.comms.SpeakText("sorry I did not get that")
+        
+    #     self.comms.modeChange(0)
+    #     self.comms.publishArtLocation(requestedArtwork)
+        
+    #     # wait for subscriber to say it's found the artwork
+    #     print("Waiting for scan trigger...")
+    #     timeout = 10  # seconds
+    #     start = time.time()
+
+    #     while not self.scanNow and (time.time() - start < timeout):
+    #         rclpy.spin_once(self, timeout_sec=0.1)
+        
+    #     if self.scanNow:
+    #         self.artReq.data = True
+    #         self.future = self.client_artIdentification.call_async(self.artReq)
+    #         rclpy.spin_until_future_complete(self, self.future)
+    #         artResponse = self.future.result()
+    #         self.scanNow = False
+    #         print(f"the response was {artResponse}")
+    #         if artResponse.success:
+    #             self.comms.artWorkInfo(artResponse.message)
+
+
     def artWorkInfo(self):
         print("Into the Artwork Prompt")
         while True:
@@ -295,44 +373,28 @@ class SpeechToText(Node):
                 artwork = artwork_names[artwork_idx - 1]
             else:
                 artwork = self.audioRecording(self.deviceNum, "Art Request", 1)
+
             actualArt = False
             for word in artwork.split():
                 for art in self.comms.getArtworkNames():
                     print(f"word is {word}, artwork is {art}")
-                    if word == art:
+                    if word.strip() == art.strip():
                         print("matched")
                         requestedArtwork = word
                         actualArt = True
                         break
-                    
+                if actualArt:
+                    break
+
             if actualArt:
-                # go to the artwork then scan
                 break
             else:
-                # spin in a circle till you see artwork
-                # self.comms.modeChange(3)
                 self.comms.SpeakText("sorry I did not get that")
-        
+
         self.comms.modeChange(0)
         self.comms.publishArtLocation(requestedArtwork)
-        
-        # wait for subscriber to say it's found the artwork
-        print("Waiting for scan trigger...")
-        timeout = 10  # seconds
-        start = time.time()
+        print("Entered Artwork Mode")
 
-        while not self.scanNow and (time.time() - start < timeout):
-            rclpy.spin_once(self, timeout_sec=0.1)
-        
-        if self.scanNow:
-            self.artReq.data = True
-            self.future = self.client_artIdentification.call_async(self.artReq)
-            rclpy.spin_until_future_complete(self, self.future)
-            artResponse = self.future.result()
-            self.scanNow = False
-            print(f"the response was {artResponse}")
-            if artResponse.success:
-                self.comms.artWorkInfo(artResponse.message)
 
     def getTable(self):
         self.listening_event.clear()
