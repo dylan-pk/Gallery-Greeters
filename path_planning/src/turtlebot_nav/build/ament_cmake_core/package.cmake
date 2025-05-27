@@ -5,7 +5,7 @@ set(turtlebot_nav_BUILD_DEPENDS "rclcpp" "rclcpp_action" "rclcpp_lifecycle" "lif
 set(turtlebot_nav_BUILDTOOL_DEPENDS "ament_cmake")
 set(turtlebot_nav_BUILD_EXPORT_DEPENDS "rclcpp" "rclcpp_action" "rclcpp_lifecycle" "lifecycle_msgs" "geometry_msgs" "nav_msgs" "nav2_msgs" "tf2" "tf2_ros" "tf2_geometry_msgs" "yaml-cpp" "opencv" "sensor_msgs")
 set(turtlebot_nav_BUILDTOOL_EXPORT_DEPENDS )
-set(turtlebot_nav_EXEC_DEPENDS "rclcpp" "rclcpp_action" "rclcpp_lifecycle" "lifecycle_msgs" "geometry_msgs" "nav_msgs" "nav2_msgs" "tf2" "tf2_ros" "tf2_geometry_msgs" "yaml-cpp" "opencv" "sensor_msgs")
+set(turtlebot_nav_EXEC_DEPENDS "python3" "python3-matplotlib" "rclcpp" "rclcpp_action" "rclcpp_lifecycle" "lifecycle_msgs" "geometry_msgs" "nav_msgs" "nav2_msgs" "tf2" "tf2_ros" "tf2_geometry_msgs" "yaml-cpp" "opencv" "sensor_msgs")
 set(turtlebot_nav_TEST_DEPENDS "ament_lint_auto" "ament_lint_common")
 set(turtlebot_nav_GROUP_DEPENDS )
 set(turtlebot_nav_MEMBER_OF_GROUPS )

@@ -123,6 +123,19 @@ ament_target_dependencies(path_subscriber
   nav_msgs
 )
 
+target_include_directories(path_subscriber PRIVATE
+  ${Python3_INCLUDE_DIRS}
+  # /path/to/matplotlib-cpp  # Uncomment and set if needed
+)
+
+target_link_libraries(path_subscriber
+  ${OpenCV_LIBS}
+)
+
+target_include_directories(path_subscriber PRIVATE
+  ${OpenCV_INCLUDE_DIRS}
+)
+
 ament_target_dependencies(goal_publisher 
 rclcpp geometry_msgs
 )

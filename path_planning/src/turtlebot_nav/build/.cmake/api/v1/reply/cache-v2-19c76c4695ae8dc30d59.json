@@ -1918,6 +1918,30 @@
 			"value" : ""
 		},
 		{
+			"name" : "_Python3_DEVELOPMENT_EMBED_SIGNATURE",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : ""
+				}
+			],
+			"type" : "INTERNAL",
+			"value" : "625d9e0f7a1af1ddb80bfa11fbea90e0"
+		},
+		{
+			"name" : "_Python3_DEVELOPMENT_MODULE_SIGNATURE",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : ""
+				}
+			],
+			"type" : "INTERNAL",
+			"value" : "4bc14a0ea6a21ea267e38aa660e9b54b"
+		},
+		{
 			"name" : "_Python3_EXECUTABLE",
 			"properties" : 
 			[
@@ -1928,6 +1952,18 @@
 			],
 			"type" : "INTERNAL",
 			"value" : "/usr/bin/python3"
+		},
+		{
+			"name" : "_Python3_INCLUDE_DIR",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "Path to a file."
+				}
+			],
+			"type" : "INTERNAL",
+			"value" : "/usr/include/python3.10"
 		},
 		{
 			"name" : "_Python3_INTERPRETER_PROPERTIES",
@@ -1952,6 +1988,42 @@
 			],
 			"type" : "INTERNAL",
 			"value" : "0f3e53742e142b1d9e50e4ca5b901dd8"
+		},
+		{
+			"name" : "_Python3_LIBRARY_RELEASE",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "Path to a library."
+				}
+			],
+			"type" : "INTERNAL",
+			"value" : "/usr/lib/x86_64-linux-gnu/libpython3.10.so"
+		},
+		{
+			"name" : "_Python3_NUMPY_SIGNATURE",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : ""
+				}
+			],
+			"type" : "INTERNAL",
+			"value" : "2c9f54926079e6790283292d6d849f51"
+		},
+		{
+			"name" : "_Python3_NumPy_INCLUDE_DIR",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "Path to a file."
+				}
+			],
+			"type" : "INTERNAL",
+			"value" : "/usr/lib/python3/dist-packages/numpy/core/include"
 		},
 		{
 			"name" : "__pkg_config_arguments__OPENSSL",

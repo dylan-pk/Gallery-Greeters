@@ -5,6 +5,7 @@
 /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/CMakeFiles/path_to_goal.dir
 /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/CMakeFiles/path_to_goal2.dir
 /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/CMakeFiles/path_to_goal4.dir
+/home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/CMakeFiles/path_to_goal5.dir
 /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/CMakeFiles/path_subscriber.dir
 /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/CMakeFiles/goal_publisher.dir
 /home/lachlan/git/Gallery-Greeters/path_planning/src/turtlebot_nav/build/CMakeFiles/test.dir

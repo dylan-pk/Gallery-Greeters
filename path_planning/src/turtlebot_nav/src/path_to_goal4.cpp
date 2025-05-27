@@ -1,4 +1,3 @@
-
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
@@ -836,7 +835,10 @@ void dynamic_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
     std::vector<Point> get_neighbors(const Point &p)
     {
         std::vector<Point> neighbors;
-        std::vector<std::pair<int, int>> deltas = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        std::vector<std::pair<int, int>> deltas = {
+    {1, 0}, {-1, 0}, {0, 1}, {0, -1},    // cardinal directions
+    {1, 1}, {1, -1}, {-1, 1}, {-1, -1}   // diagonals
+};
         for (const auto &d : deltas)
         {
             int nx = p.x + d.first;
