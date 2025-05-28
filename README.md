@@ -192,6 +192,22 @@ export ROS_DOMAIN_ID =<ID>
 ros2 launch gallery_greeters2 artbot.launch.py use_simulation:=false
 ```
 ## Interacting with The Robot
+_Bolded words are the key words which trigger commands_
+To initialise the interaction start by calling out to the robot “Hey **Jarvis**” 
 
+There are 10 ways to interact with Jarvis as an operator or guest of the art gallery: 
 
+1. To tell ArtBot to go greet guests say “Go into **Greeting** mode”
+  - To which the ArtBot will move to his set position for greeting guests
+    
+![Artbot in Greeting Mode](/ReadMeImages/Interaction1.png)
+    
+2. To place a drinks order with Artbot say “I would like a **drink**”
+ - The Artbot will respond asking what drink you would like displaying the options for you.
+ - Artbot will recognise the type of drink you ask for if it is on the list and follow up asking for the quantity of drinks you would like.
+ - After confirming these details, Artbot will ask if you want any more drinks until you say no.
+ - The order will then be sent to the kitchen and wait staff robots.
 
+![Drink Options Screen](/ReadMeImages/Interaction2.png)
+
+3. To ask about the art say “I would like to look at the **art**” or “Tell me about the **artwork**” 
