@@ -198,16 +198,76 @@ To initialise the interaction start by calling out to the robot “Hey **Jarvis*
 There are 10 ways to interact with Jarvis as an operator or guest of the art gallery: 
 
 1. To tell ArtBot to go greet guests say “Go into **Greeting** mode”
-  - To which the ArtBot will move to his set position for greeting guests
+    - To which the ArtBot will move to his set position for greeting guests
     
 ![Artbot in Greeting Mode](/ReadMeImages/Interaction1.png)
     
 2. To place a drinks order with Artbot say “I would like a **drink**”
- - The Artbot will respond asking what drink you would like displaying the options for you.
- - Artbot will recognise the type of drink you ask for if it is on the list and follow up asking for the quantity of drinks you would like.
- - After confirming these details, Artbot will ask if you want any more drinks until you say no.
- - The order will then be sent to the kitchen and wait staff robots.
+    - The Artbot will respond asking what drink you would like displaying the options for you.
+    - Artbot will recognise the type of drink you ask for if it is on the list and follow up asking for the quantity of drinks you would like.
+    - After confirming these details, Artbot will ask if you want any more drinks until you say no.
+    - The order will then be sent to the kitchen and wait staff robots.
 
 ![Drink Options Screen](/ReadMeImages/Interaction2.png)
 
-3. To ask about the art say “I would like to look at the **art**” or “Tell me about the **artwork**” 
+3. To ask about the art say “I would like to look at the **art**” or “Tell me about the **artwork**"
+    - To which Jarvis will ask “Which Artwork would you like to know about”
+    - Respond with a simplified name such as “the one with clocks”, “The one from Minecraft” or “The Duchess” and the artbot will take you to it.
+
+![ArtBot Positioned infront of Artwork for Scanning](/ReadMeImages/Interaction3.png)
+
+4. To put Jarvis in Sentry Mode (Moving around the environment waiting for guest interaction) say “Go for a **walk**”
+    - To which Jarvis will plan a path around the perimeter of the gallery and continue that path until another “Hey Jarvis” command is given.
+
+![ArtBot Wandering Parimeter of Environment](/ReadMeImages/Interaction4.png)
+
+5. To get Jarvis to dance say “Do a **Dance**”
+    - To which Jarvis will dance on the spot
+
+6. To send Jarvis back to the charging port say “Go and **charge**”
+     - To which Jarvis will go to his Initial position at his charging port.
+
+![ArtBot in Charging Mode](/ReadMeImages/Interaction5.png)
+
+7. To get Jarvis to take you to a table say “Take me to a **Table**”
+     - To which Jarvis will ask which table and after giving him a number from 1-3 he will move to one of the 3 available tables.
+
+![ArtBot Going to a Table](/ReadMeImages/Interaction6.png)
+
+8. To call a waiter to the table say “Call a **waiter**” which will bring a waiter to the closest table
+
+9. To ask Jarvis for a fun fact say “Tell me a fun **fact**”
+      - To which Jarvis will respond with one of his many art based fun facts
+      - 
+![Van Gough Fun Fact](/ReadMeImages/Interaction7.png)
+
+10. To receive an update about the status of the tables say “Tell me the **table status**”
+      - Jarvis will then display an infographic visually depicting the status of all tables
+  
+![Example Table Status](/ReadMeImages/Interaction8.png)
+
+11. To be taken through each artwork, ask Jarvis ”Take me to a **Painting**” and Jarvis will take you to an artwork without you needing to ask which artwork it
+
+## Troubleshooting and FAQs
+### Issues Installing pyaudio
+If there are build issues installing pyaudio try running the following command
+```
+sudo apt-get install portaudio19-dev python3-pyaudio
+```
+### Map Not Showing Up in Rvis 
+Make sure you have corrected the file path on line 20 with your linux user name
+```
+map_file = os.path.expanduser('/home/<USER>/ros2_ws/gallery_map.yaml')
+```
+Also ensure that you have killed all Gazebo and Rvis processes before running the launch file 
+```
+killall -9 gzserver gzclient  
+pkill –f map_server  
+pkill –f nav2  
+pkill –f rviz2
+```
+### RQT Image View Issues 
+When running the template matching launch file and attempting to view image data through the rqt_image_view window the data isn’t displayed. This issue is bypassed by running the following command. This will continue to open the latest frame if the defualt image viewer app is set to the built in linux image viewer. 
+```
+xdg-open /tmp/latest_camera_frame.jpg
+```
