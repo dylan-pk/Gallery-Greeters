@@ -128,4 +128,67 @@ Launching the artbot.launch.py file using the commands below will open up the Ga
 ```
 ros2 launch gallery_greeters2 artbot.launch.py use_simulation:=true
 ```
+![Expected Screens after successful launch](/ReadMeImages/LaunchFileScreenshot.png)
+
+## Running The System - Real Robot
+### Setting Up the Environment
+The first step to running the Gallery Greeters artbot in a real environment is to set up the physical environment. Within the walls of the gallery, mark out the starting position, known obstacles/tables and the artworks along the gallery walls like seen below.
+
+### Connecting to The Turtlebot
+To establish a connection to the TurtleBot your computer must be connected to the same network, for example our testing was connected to a network called TurtleBot MMR.
+
+Once both the TurtleBot and your computer are connected to the same network, connect with it via SSH. This requires knowing the IP address of the TurtleBot if this is unknown boot into the TurtleBot system with a monitor and keyboard and run the following command which will return your IP address in the terminal and note the username of the pi for the SSH connection.
+```
+hostname -I
+```
+Set the robot up into the starting position of the environment and connect the battery to power on in the home position.  
+
+Ping the IP address until it returns that it is active. 
+```
+ping <IP address>
+```
+Once the robot is able to be connected with then ssh into the raspberry pi. For example `ssh ubuntu@192.168.0.213`.
+```
+ssh <pi username>@<IP address> 
+```
+Then enter the password of the TurtleBot
+
+Launch the robot using a unique domain ID. For example `export ROS_DOMAIN_ID = 44`
+```
+export  ROS_DOMAIN_ID = <ID>
+ros2 launch turtlebot3_bringup robot.launch.py 
+```
+Repeat the SSH process in another terminal to activate the camera on the TurtleBot, instead of the robot launch command run this command. Ensure you use the same unique Domain ID
+```
+export ROS_DOMAIN_ID = <ID> 
+ros2 run camera_ros camera_node --ros-args -p format:=MJPEG -p width:=640 -p height:=480
+```
+### Mapping the Environment
+With the SSH and TurtleBot active now run through the mapping process as outlined below **running each command in a new terminal**. 
+```
+ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True 
+ros2 launch slam_toolbox online_async_launch.py use_sim_time:=True
+ros2 run rviz2 rviz2 -d /opt/ros/humble/share/nav2_bringup/rviz/nav2_default_view.rviz 
+ros2 run turtlebot3_teleop teleop_keyboard 
+ros2 run nav2_map_server map_saver_cli -f <map name>
+```
+Below is an example of the map generated with the physical environment from before. 
+![Real World Map Example](/ReadMeImages/real_map5.png)
+Now reset the TurtleBot to its starting position severing the connection with the computer and powering it back on in the starting position. Teleop the robot to each of the artworks and tables gathering the coordinates of each known position and orientation keeping the robot far away enough from the artworks so that they are in frame of the camera, this is roughly 30cm away from the artwork when using A4 paper. 
+
+Then update the artwork locations within package_audio_messages using the following command and input the names of the artworks along with the locations and orientation that the robot needs to be in for the camera to percieve the artwork. 
+```
+cd ros2_ws/src/gallery_greeters/package_audio_messages/package_audio_messages/ 
+python3 ArtDataInput.py
+```
+### Run the Physical ArtBot
+Rerun the connection to the TurtleBot with the robot powered on in the home position. Then in a new terminal run the launch file.
+```
+export ROS_DOMAIN_ID =<ID> 
+ros2 launch gallery_greeters2 artbot.launch.py use_simulation:=false
+```
+
+## Interacting with The Robot
+
+
 
