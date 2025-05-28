@@ -131,7 +131,9 @@ class Commands:
         artwork_info_path = os.path.join(resources_path, 'ArtworkInfo', 'artworkInfo.txt')
         with open(artwork_info_path, 'r') as artFile:
             self.artNames = artFile.readline().split("/")
+            print(self.artNames)
             self.artLocation = artFile.readline().split("/")
+            print(self.artLocation)
             self.artworks = {
                 name: ast.literal_eval(loc)
                 for name, loc in zip(self.artNames, self.artLocation)
