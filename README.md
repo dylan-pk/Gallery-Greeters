@@ -134,6 +134,8 @@ ros2 launch gallery_greeters2 artbot.launch.py use_simulation:=true
 ### Setting Up the Environment
 The first step to running the Gallery Greeters artbot in a real environment is to set up the physical environment. Within the walls of the gallery, mark out the starting position, known obstacles/tables and the artworks along the gallery walls like seen below.
 
+![Example of a Turtlebot in a Real Example Environment](/ReadMeImages/mapping_evidence.jpeg)
+
 ### Connecting to The Turtlebot
 To establish a connection to the TurtleBot your computer must be connected to the same network, for example our testing was connected to a network called TurtleBot MMR.
 
@@ -173,7 +175,9 @@ ros2 run turtlebot3_teleop teleop_keyboard
 ros2 run nav2_map_server map_saver_cli -f <map name>
 ```
 Below is an example of the map generated with the physical environment from before. 
+
 ![Real World Map Example](/ReadMeImages/real_map5.png)
+
 Now reset the TurtleBot to its starting position severing the connection with the computer and powering it back on in the starting position. Teleop the robot to each of the artworks and tables gathering the coordinates of each known position and orientation keeping the robot far away enough from the artworks so that they are in frame of the camera, this is roughly 30cm away from the artwork when using A4 paper. 
 
 Then update the artwork locations within package_audio_messages using the following command and input the names of the artworks along with the locations and orientation that the robot needs to be in for the camera to percieve the artwork. 
@@ -187,7 +191,6 @@ Rerun the connection to the TurtleBot with the robot powered on in the home posi
 export ROS_DOMAIN_ID =<ID> 
 ros2 launch gallery_greeters2 artbot.launch.py use_simulation:=false
 ```
-
 ## Interacting with The Robot
 
 
