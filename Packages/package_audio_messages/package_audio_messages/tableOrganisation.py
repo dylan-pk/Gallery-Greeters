@@ -41,6 +41,10 @@ class TableDatabase:
 
     def getNumofTables(self):
         return len(self.tables)
+
+    def setWaitingStatus(self, tablenum):
+        self.tables[tablenum].setDrinkStatus(True)
+        
     
     def minOccupacy(self):
         min = 10000000

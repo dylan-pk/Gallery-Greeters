@@ -665,7 +665,7 @@
 
 #include "p_controller.hpp"
 
-pController::pController(ObstacleAvoidance &obstacleavoidance) : Node("p_controller"), tolerance(0.1), obstacleavoidance_(obstacleavoidance)
+pController::pController(ObstacleAvoidance &obstacleavoidance) : Node("p_controller"), tolerance(0.05), obstacleavoidance_(obstacleavoidance)
 {
 
     cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);

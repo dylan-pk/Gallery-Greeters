@@ -20,7 +20,7 @@ import ast
 
 
 import threading
-
+SIMULATION = True
 DURATION = 2000
 WPM = 160
 GREETLOCATION = [0.66,0.82, -1.57]
@@ -128,7 +128,11 @@ class Commands:
         self.callingFace = Image.open(os.path.join(resources_path, 'callingWaiter.png'))
 
         # Load artwork info
-        artwork_info_path = os.path.join(resources_path, 'ArtworkInfo', 'artworkInfo.txt')
+        if SIMULATION:
+            artwork_info_path = os.path.join(resources_path, 'ArtworkInfo', 'artworkInfo.txt')
+        else:
+            artwork_info_path = os.path.join(resources_path, 'ArtworkInfo', 'artworkinforeal.txt')
+
         with open(artwork_info_path, 'r') as artFile:
             self.artNames = artFile.readline().split("/")
             print(self.artNames)
@@ -156,7 +160,11 @@ class Commands:
         }
 
         # Load table info
-        table_info_path = os.path.join(resources_path, 'tableInfo.txt')
+        if SIMULATION:
+            table_info_path = os.path.join(resources_path, 'tableInfo.txt')
+        else:
+            table_info_path = os.path.join(resources_path, 'tableInfoReal.txt')
+
         self.tables = TableDatabase(table_info_path)
     
     def getArtworkNames(self):
@@ -275,7 +283,11 @@ class Commands:
     def sendDrinkOrder(self, drinks, table):
         for i in range(3):
             print("Ordering " + str(drinks[i][1]) + " " + str(drinks[i][0]) + "s")
-        # self.drinks_pub.publish(drinks)
+        roboLocation = self.currentPos[1]
+        print(roboLocation)
+        table = self.tables.getClosestTable(roboLocation)
+        self.tables.setWaitingStatus(table)
+
 
     def publishArtLocation(self, artwork=None, idx=0):
         if artwork is None:

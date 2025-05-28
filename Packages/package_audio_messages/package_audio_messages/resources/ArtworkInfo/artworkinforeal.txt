@@ -1,0 +1,6 @@
+trap/seasons/clock/poker/marilyn/tank_girl/dinosaur/scream/squares/quay/duchess/funky/skull
+[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]/[0.0,0.0,0.0]
+texturedtext
+textured
+textured
+texturedtext

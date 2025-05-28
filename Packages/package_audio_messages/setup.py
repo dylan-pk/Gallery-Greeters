@@ -32,7 +32,7 @@ setup(
         'console_scripts': [
             'speech_node = package_audio_messages.SpeechToText:main',
         ],
-    },
+    }
 )
 
 # from setuptools import find_packages, setup

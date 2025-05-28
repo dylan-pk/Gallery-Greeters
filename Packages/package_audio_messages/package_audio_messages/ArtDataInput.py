@@ -12,7 +12,7 @@ class ArtDataInput:
         self.collatedNames = ""
         self.collatedLocations = ""
 
-    def run(self):
+    def main(self):
         print("Welcome to Data Input for the Art Names and Locations for the Gallery Greeter")
         
         while self.adding:
@@ -56,7 +56,7 @@ class ArtDataInput:
         script_dir = os.path.dirname(os.path.realpath(__file__))
 
         # Build the path to artworkInfo.txt relative to the script
-        filepath = os.path.join(script_dir, 'resources', 'ArtworkInfo', 'artworkInfo.txt')
+        filepath = os.path.join(script_dir, 'resources', 'ArtworkInfo', 'artworkinforealcopy.txt')
         print(filepath)
 
         overwriteResponse = input("Do you want to Overwrite the Existing Data Set (Y/N): ")
@@ -105,7 +105,10 @@ class ArtDataInput:
                 print(f"Error: File not found at {filepath}")
             except Exception as e:
                 print(f"An error occurred: {e}")
-            
-if __name__ == "__main__":
+
+def main():
     obj = ArtDataInput()
-    obj.run()
+    obj.main()
+
+if __name__ == "__main__":
+    main()

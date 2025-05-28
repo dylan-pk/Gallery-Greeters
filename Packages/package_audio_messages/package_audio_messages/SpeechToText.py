@@ -29,10 +29,10 @@ from nav_msgs.msg import Path
 audio_to_main_queue = queue.Queue()
 main_to_gui_queue = queue.Queue()
 
-TESTING_MODE = True
-# ACCESS_KEY = "UNuftCmjek2mefFH8OZiwT0LiaeSZJBcFdo1GaqCGcEiKTGQfR7vYQ=="# - Andrew
+TESTING_MODE = False
+ACCESS_KEY = "UNuftCmjek2mefFH8OZiwT0LiaeSZJBcFdo1GaqCGcEiKTGQfR7vYQ=="# - Andrew
 # ACCESS_KEY = "8HEM095Qo29k5b/OQ01LPFlr+FfiUHVRi0k1N1rYnUQ2ZvZuig2zdA==" # -Anika
-ACCESS_KEY = "bn2ZsEFlgup44MWN5051+pHvMknkAUIr4++BxsKPFl1CXT6dcy/IKQ==" # -Dylan
+# ACCESS_KEY = "bn2ZsEFlgup44MWN5051+pHvMknkAUIr4++BxsKPFl1CXT6dcy/IKQ==" # -Dylan
 READY_FOR_COMMAND = False
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
