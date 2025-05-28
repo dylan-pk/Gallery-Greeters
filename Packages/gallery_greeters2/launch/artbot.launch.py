@@ -1,9 +1,19 @@
 from launch import LaunchDescription
 from launch.actions import SetEnvironmentVariable, ExecuteProcess, TimerAction
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition, UnlessCondition
+
 import os
 
 def generate_launch_description():
-    # Kill lingering Gazebo instances
+    simulation_arg = DeclareLaunchArgument(
+        'use_simulation',
+        default_value='true',
+        description='Whether to launch Gazebo simulation or real robot drivers'
+    )
+    use_simulation = LaunchConfiguration('use_simulation')
+
     kill_zombies = ExecuteProcess(
         cmd=[
             'bash', '-c',
@@ -16,12 +26,11 @@ def generate_launch_description():
         output='screen'
     )
 
-
-    map_file = os.path.expanduser('/home/alec/ros2_ws/gallery_map.yaml')
+    sim_map_file = os.path.expanduser('/home/alec/ros2_ws/gallery_map.yaml')
+    real_map_file = os.path.expanduser('/home/alec/ros2_ws/real_map5.yaml')
 
     set_model = SetEnvironmentVariable('TURTLEBOT3_MODEL', 'waffle_pi')
 
-    # Step 1: Launch Gazebo first
     gazebo_launch = TimerAction(
         period=5.0,
         actions=[
@@ -29,67 +38,128 @@ def generate_launch_description():
                 cmd=[
                     'ros2', 'launch', 'turtlebot3_gazebo', 'Gallery_Test2.launch.py'
                 ],
-                output='screen'
+                output='screen',
+                condition=IfCondition(use_simulation)
             )
         ]
     )
 
-
-    # Step 2: Launch Nav2 AFTER Gazebo has time to start (wait ~5s)
     nav2_launch = TimerAction(
-        period=5.0,
+        period=10.0,
         actions=[
             ExecuteProcess(
                 cmd=[
                     'ros2', 'launch', 'turtlebot3_navigation2', 'navigation2.launch.py',
-                    f'map:={map_file}',
+                    f'map:={sim_map_file}',
                     'use_sim_time:=true'
                 ],
-                output='screen'
+                output='screen',
+                condition=IfCondition(use_simulation)
             )
         ]
     )
 
-    # Step 3: Launch other nodes after Nav2 (~5s delay)
-    p_controller_launch = TimerAction(
-        period=40.0,
-        actions=[
-            ExecuteProcess(
-                cmd=['ros2', 'run', 'p_controller', 'p_controller'],
-                output='screen'
-            )
-        ]
-    )
-
-    path_planner_launch = TimerAction(
-        period=45.5,
-        actions=[
-            ExecuteProcess(
-                cmd=['ros2', 'run', 'turtlebot_nav', 'path_to_goal4'],
-                output='screen'
-            )
-        ]
-    )
-
-    template_match_launch = TimerAction(
+    nav2_real_launch = TimerAction(
         period=10.0,
         actions=[
             ExecuteProcess(
-                cmd=['ros2', 'run', 'template_match', 'template_match'],
-                output='screen'
+                cmd=[
+                    'ros2', 'launch', 'turtlebot3_navigation2', 'navigation2.launch.py',
+                    'use_sim_time:=false',
+                    f'map:={real_map_file}'
+                ],
+                output='screen',
+                condition=UnlessCondition(use_simulation)
+            )
+        ]
+    )
+
+    # Fixed: p_controller in new terminal
+    p_controller_launch = TimerAction(
+        period=30.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    'gnome-terminal', '--', 'bash', '-c',
+                    'source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && ros2 run p_controller p_controller; exec bash'
+                ],
+                shell=False
+            )
+        ]
+    )
+
+    # Fixed: Path planner (sim)
+    path_planner_launch_sim = TimerAction(
+        period=30.5,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    'gnome-terminal', '--', 'bash', '-c',
+                    'source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && ros2 run turtlebot_nav path_to_goal5; exec bash'
+                ],
+                shell=False,
+                condition=IfCondition(use_simulation)
+            )
+        ]
+    )
+
+    # Fixed: Path planner (real)
+    path_planner_launch_real = TimerAction(
+        period=30.5,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    'gnome-terminal', '--', 'bash', '-c',
+                    'source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && ros2 run turtlebot_nav path_to_goal4; exec bash'
+                ],
+                shell=False,
+                condition=UnlessCondition(use_simulation)
+            )
+        ]
+    )
+
+    # Fixed: Template match node
+    template_match_launch = TimerAction(
+        period=11.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    'gnome-terminal', '--', 'bash', '-c',
+                    'source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && ros2 launch template_match template_match_test.launch.py; exec bash'
+                ],
+                shell=False
+            )
+        ]
+    )
+
+    # Fixed: Audio interface node
+    interface_launch = TimerAction(
+        period=11.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    'gnome-terminal', '--', 'bash', '-c',
+                    'source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && ros2 run package_audio_messages speech_node; exec bash'
+                ],
+                shell=False
             )
         ]
     )
 
     return LaunchDescription([
+        simulation_arg,
         kill_zombies,
         set_model,
         gazebo_launch,
         nav2_launch,
+        nav2_real_launch,
         p_controller_launch,
-        path_planner_launch,
-        template_match_launch
+        path_planner_launch_sim,
+        path_planner_launch_real,
+        template_match_launch,
+        interface_launch
     ])
+
 
 
 #run this before the launch file
