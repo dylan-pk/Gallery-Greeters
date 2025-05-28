@@ -30,8 +30,9 @@ audio_to_main_queue = queue.Queue()
 main_to_gui_queue = queue.Queue()
 
 TESTING_MODE = True
-ACCESS_KEY = "UNuftCmjek2mefFH8OZiwT0LiaeSZJBcFdo1GaqCGcEiKTGQfR7vYQ=="# - Andrew
+# ACCESS_KEY = "UNuftCmjek2mefFH8OZiwT0LiaeSZJBcFdo1GaqCGcEiKTGQfR7vYQ=="# - Andrew
 # ACCESS_KEY = "8HEM095Qo29k5b/OQ01LPFlr+FfiUHVRi0k1N1rYnUQ2ZvZuig2zdA==" # -Anika
+ACCESS_KEY = "bn2ZsEFlgup44MWN5051+pHvMknkAUIr4++BxsKPFl1CXT6dcy/IKQ==" # -Dylan
 READY_FOR_COMMAND = False
 
 ## This class is all about processing the audio for getting the initial commands and then also for any commands that require multiple prompts ##
@@ -68,6 +69,7 @@ class SpeechToText(Node):
         self.comms = Commands(self, gui_queue)
         self.numOfTables = self.comms.getNumofTables()
         self.sentryModeStarted = False
+        self.paintingToCheck = 20
         
 
     def startVoiceRecognition(self):
@@ -163,13 +165,16 @@ class SpeechToText(Node):
                     case "dance":
                         self.listening_event.clear()
                         self.comms.modeChange(2)
+                    case "painting":
+                        self.listening_event.clear()
+                        self.checkArtwork()
                     case _:
                         # print("Not a command word")
                         pass
         else:
             self.listening_event.clear()
             print("1: Greet Guests\n2: Order a Drink\n3: Tell me about the art\n4: Wander Around\n"
-            "5: Do a Dance\n6: Go to a Table\n7: Get Table Status\n8: Call a waiter\n9: Tell me a Fun Fact\n10: Go to Charging Station")
+            "5: Do a Dance\n6: Go to a Table\n7: Get Table Status\n8: Call a waiter\n9: Tell me a Fun Fact\n10: Go to Charging Station\n11: Take me to a Painting")
             commandNum = int(input("Which Command: "))
             match commandNum:
                     case 1:
@@ -205,6 +210,9 @@ class SpeechToText(Node):
                     case 10:
                         self.listening_event.clear()
                         self.comms.triggerCharge() # Waiting for how to send data
+                    case 11:
+                        self.listening_event.clear()
+                        self.checkArtwork()
                     case _:
                         # print("Not a command word")
                         pass
@@ -392,8 +400,19 @@ class SpeechToText(Node):
                 self.comms.SpeakText("sorry I did not get that")
 
         self.comms.modeChange(0)
-        self.comms.publishArtLocation(requestedArtwork)
+        self.comms.publishArtLocation(artwork=requestedArtwork)
         print("Entered Artwork Mode")
+
+    def checkArtwork(self):
+        print("Going to next Painting")
+        if self.paintingToCheck >= len(self.comms.getArtworkNames()):
+            self.paintingToCheck = 0
+        else:
+            self.paintingToCheck += 1
+        
+        self.comms.modeChange(0)
+        self.comms.publishArtLocation(idx=self.paintingToCheck)
+
 
 
     def getTable(self):

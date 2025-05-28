@@ -131,7 +131,9 @@ class Commands:
         artwork_info_path = os.path.join(resources_path, 'ArtworkInfo', 'artworkInfo.txt')
         with open(artwork_info_path, 'r') as artFile:
             self.artNames = artFile.readline().split("/")
+            print(self.artNames)
             self.artLocation = artFile.readline().split("/")
+            print(self.artLocation)
             self.artworks = {
                 name: ast.literal_eval(loc)
                 for name, loc in zip(self.artNames, self.artLocation)
@@ -156,37 +158,6 @@ class Commands:
         # Load table info
         table_info_path = os.path.join(resources_path, 'tableInfo.txt')
         self.tables = TableDatabase(table_info_path)
-        # Robot Faces
-        # self.default_image = Image.open("audio_messages/src/resources/default.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        # self.dancingFace = Image.open("audio_messages/src/resources/danceFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        # self.chargeFace = Image.open("audio_messages/src/resources/chargeFace.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        # self.callingFace = Image.open("audio_messages/src/resources/callingWaiter.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-
-        # # Information about Artwork        
-        # with open("audio_messages/src/resources/ArtworkInfo/artworkInfo.txt", "r") as artFile:
-        #     self.artNames = artFile.readline().split("/")
-        #     self.artLocation = artFile.readline().split("/")
-        #     self.artworks = {}
-        #     for i, l in zip(self.artNames, self.artLocation):
-        #         loc = ast.literal_eval(l)
-        #         self.artworks[i] = loc
-        #         # self.artworks.update({i: l})
-        #     print(self.artworks)
-        #     self.artInfo = artFile.readlines()
-        #     # print(self.artInfo)
-        # # self.artImages = {a: Image.open(f"audio_messages/src/resources/ArtworkInfo/{self.artworks[a].strip()}_info.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        # #                    for a in range(5)}
-        # self.artImages = {name: Image.open(f"audio_messages/src/resources/ArtworkInfo/{name.strip()}_info.png") for name in list(self.artworks.keys())[:5]}
-        # # print(self.artImages)
-
-        # # Fun Facts
-        # with open("audio_messages/src/resources/FunFacts/funfacts.txt", "r") as factFile:
-        #     self.facts = factFile.readlines()
-        # self.factImages = {i: Image.open(f"audio_messages/src/resources/FunFacts/image{i}.png")#.resize((self.half_width, self.half_height), Image.ANTIALIAS)
-        #                    for i in range(10)}
-        
-        # # Table Database
-        # self.tables = TableDatabase("audio_messages/src/resources/tableInfo.txt")
     
     def getArtworkNames(self):
         return self.artworks
@@ -306,9 +277,14 @@ class Commands:
             print("Ordering " + str(drinks[i][1]) + " " + str(drinks[i][0]) + "s")
         # self.drinks_pub.publish(drinks)
 
-    def publishArtLocation(self, artwork):
-        print(f"publishing location: [{self.artworks[artwork][0]}, {self.artworks[artwork][1]}, {self.artworks[artwork][2]}]")
-        self.publisher_location.publish(self.establishLocations(float(self.artworks[artwork][0]), float(self.artworks[artwork][1]), float(self.artworks[artwork][2])))
+    def publishArtLocation(self, artwork=None, idx=0):
+        if artwork is None:
+            assumedName = self.artNames[idx]
+            print(f"publishing location for painting {idx}: [{self.artworks[assumedName][0]}, {self.artworks[assumedName][1]}, {self.artworks[assumedName][2]}]")
+            self.publisher_location.publish(self.establishLocations(float(self.artworks[assumedName][0]), float(self.artworks[assumedName][1]), float(self.artworks[assumedName][2])))
+        else:
+            print(f"publishing location: [{self.artworks[artwork][0]}, {self.artworks[artwork][1]}, {self.artworks[artwork][2]}]")
+            self.publisher_location.publish(self.establishLocations(float(self.artworks[artwork][0]), float(self.artworks[artwork][1]), float(self.artworks[artwork][2])))
     
     def artWorkInfo(self, artwork):
         # Read closest artwork from publisher

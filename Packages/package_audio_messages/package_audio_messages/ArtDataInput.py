@@ -47,26 +47,30 @@ class ArtDataInput:
         print(self.collatedNames)
         print(self.collatedLocations)
 
-        overwriteResponse = input("Do you want to Overwrite the Existing Data Set (Y/N): ")
+        # package_path = get_package_share_directory('package_audio_messages')
+        # resources_path = os.path.join(package_path, 'resources')
+        # filepath = os.path.join(resources_path, 'ArtworkInfo', 'artworkInfo.txt')
+        
+        
+        # Get absolute path to the directory of this script
+        script_dir = os.path.dirname(os.path.realpath(__file__))
 
-        package_path = get_package_share_directory('package_audio_messages')
-        resources_path = os.path.join(package_path, 'resources')
-        filepath = os.path.join(resources_path, 'ArtworkInfo', 'artworkInfo.txt')
+        # Build the path to artworkInfo.txt relative to the script
+        filepath = os.path.join(script_dir, 'resources', 'ArtworkInfo', 'artworkInfo.txt')
+        print(filepath)
+
+        overwriteResponse = input("Do you want to Overwrite the Existing Data Set (Y/N): ")
 
         if overwriteResponse.lower() == 'y':
             try:
                 with open(filepath, 'r') as file:
                     lines = file.readlines()
 
-                # if len(lines) == 1: # Replace the first line
                 print(lines[0])
                 lines[0] = self.collatedNames + '\n'
-                # if len(lines) > 1: # Replace the second line
-                print(lines[1])
-                lines[1] = self.collatedLocations + '\n' # Add newline to make it a line
 
-                # If you want to insert instead of replace
-                # lines.insert(1, new_line + '\n')
+                print(lines[1])
+                lines[1] = self.collatedLocations + '\n'
 
                 with open(filepath, 'w') as file:
                     file.writelines(lines)
@@ -80,7 +84,27 @@ class ArtDataInput:
             except Exception as e:
                 print(f"An error occurred: {e}")
         else:
-            overwrite = False
+            try:
+                with open(filepath, 'r') as file:
+                    lines = file.readlines()
+
+                currentArtNames = lines[0]
+                lines[0] = currentArtNames + "/" + self.collatedNames + '\n'
+
+                currentArtLocations = lines[1]
+                lines[1] = currentArtLocations + "/" + self.collatedLocations + '\n'
+
+                with open(filepath, 'w') as file:
+                    file.writelines(lines)
+                print("Successfully Overwritten Art Data.")
+
+                with open(filepath, 'r') as file:
+                    print("File contents after write:")
+                    print(file.read())
+            except FileNotFoundError:
+                print(f"Error: File not found at {filepath}")
+            except Exception as e:
+                print(f"An error occurred: {e}")
             
 if __name__ == "__main__":
     obj = ArtDataInput()
