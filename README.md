@@ -106,4 +106,26 @@ colcon build --symlink-install
 source install/setup.bash
 echo "source ~/ros2_ws/install/setup.bash" >> ~/.bashrc
 ```
+## Pre-Running Code - API Key, Path Directory and Data Update
+Please note that at the current stage of development, before running the code your own api key for access to Porcupine from PicoVoice requires your own API key which can be obtained from the [PicoVoice Console](https://console.picovoice.ai/). Simply create an account and request a porcupine API key, then copy it from the website and replace the current ACCESS KEY variable in SpeechToText.py with your access key.
+
+Secondly the path directory must be updated in the artbot.launch.py file replacing user in line with your Linux user name and for the real map replacing the real_map_name with your map
+```
+sim_map_file = os.path.expanduser('/home/<USER>/ros2_ws/gallery_map.yaml') 
+real_map_file = os.path.expanduser('/home/<USER>/ros2_ws/<real_map_name>.yaml')
+```
+## Running The System - Simulation
+### Clean Gazebo and Nav2
+To ensure the packages and software launches correctly, kill any Gazebo or Rvis processes using the commands below. Doing so will allow the map to launch freshly each time and ensure correct localisation.
+```
+killall -9 gzserver gzclient  
+pkill –f map_server  
+pkill –f nav2  
+pkill –f rviz2
+```
+### Run the Gallery Greeters Launch File 
+Launching the artbot.launch.py file using the commands below will open up the Gazebo world with the Turtlebot spawned into its charging port. It will load the map and then run the control, path planning and perception packages. All will be active and ready to interact when voice commands are given and the path planning package will automatically localise the robot within the map so it is ready to plan it’s path. The live occupancy grid will also open showing a black background of free space and the known objects in white which will update as new objects are detected.
+```
+ros2 launch gallery_greeters2 artbot.launch.py use_simulation:=true
+```
 
